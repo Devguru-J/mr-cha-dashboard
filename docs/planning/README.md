@@ -78,3 +78,24 @@
 2. `dealer_discounts` API/UI 구현 (dealer write 한정)
 3. Drizzle 기반 DB 접근 점진 전환 (핵심 조회 API 우선)
 4. CSV 업로드 경로 추가 + 운영 가이드 전환
+
+## 9) Immediate Next Sprint (S5) Scope
+1. 인증/권한
+- Supabase Auth 로그인(운영자) 적용
+- `user_roles` 기반 role 판별 미들웨어 추가
+- 화면/API 접근 제어(`super`, `manager`, `dealer`)
+
+2. RLS 정책
+- `residual_values`, `uploads`: `super/manager` write, `dealer` read-only
+- `dealer_discounts`: `dealer` scoped write 허용
+- 정책 테스트 케이스(허용/거부) 문서화
+
+3. 딜러 할인 기능
+- `dealer_discounts` 목록/등록/수정 API
+- 딜러 할인 페이지 UI(필터/등록 폼/이력)
+- 변경 이력 컬럼(`created_at`, `updated_at`, 작성자`) 노출
+
+4. 배포 파이프라인 정리
+- GitHub 연동 Cloudflare Pages 기준 설정 확정
+- Root: repo root, Build output: `dist`, Functions: `functions`
+- Preview/Production 브랜치 전략 문서화

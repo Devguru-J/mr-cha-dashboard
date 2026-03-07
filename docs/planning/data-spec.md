@@ -137,3 +137,27 @@
 - purpose: 필터 입력 자동완성
 - fields: `field=maker_name|model_name|finance_name`
 - filters: `sourceType`, `snapshotMonth`, `q`, `limit`
+
+## 11) Planned API Spec (Next)
+1. Auth
+- `GET /api/me`
+- response: `user_id`, `email`, `role`, `dealer_scope`
+
+2. Dealer Discounts
+- `GET /api/dealer-discounts`
+- `POST /api/dealer-discounts`
+- `PATCH /api/dealer-discounts/:id`
+- `DELETE /api/dealer-discounts/:id` (soft-delete 여부는 추후 결정)
+
+3. Upload / Change Ops
+- `POST /api/uploads/:id/compute-changes`
+- 목적: 업로드 완료 후 변경분 materialize(선계산)
+
+## 12) Deployment Config Plan (GitHub -> Cloudflare Pages)
+- Root directory: repository root
+- Build command: `bun run build`
+- Build output directory: `dist`
+- Functions directory: `functions`
+- Branch strategy:
+  - Production: `main`
+  - Preview: `feature/*`, `chore/*`, `fix/*`

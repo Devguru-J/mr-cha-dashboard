@@ -51,10 +51,39 @@
 - [ ] 업로드 이력 화면
 - [ ] 에러 로깅/모니터링 기초 연결
 
+### Sprint 5 Execution Checklist (Order)
+1. Auth Baseline
+- [ ] Supabase Auth 세션 검증 미들웨어 추가
+- [ ] API 공통 컨텍스트에 `user_id`, `role` 주입
+- [ ] 프론트 로그인/로그아웃 상태 표시
+
+2. Role / RLS
+- [ ] `user_roles` seed 정책(`super` 1명 초기 등록) 정의
+- [ ] `residual_values`/`uploads` RLS SQL 적용
+- [ ] `dealer_discounts` RLS SQL 적용(자기 scope만 write)
+- [ ] 정책 검증 쿼리 문서(`allow/deny`) 작성
+
+3. Dealer Discounts
+- [ ] `GET /api/dealer-discounts`
+- [ ] `POST /api/dealer-discounts`
+- [ ] `PATCH /api/dealer-discounts/:id`
+- [ ] 할인 페이지 UI(목록 + 등록/수정)
+
+4. Ops / Deploy
+- [ ] GitHub -> Cloudflare Pages build settings 문서화
+- [ ] 환경변수 매트릭스 정리(Preview/Production)
+- [ ] 장애 대응 Runbook 1차 작성(업로드 실패/권한 오류)
+
 ## Sprint 6 - CSV Migration
 - [ ] CSV 업로드 엔드포인트 추가
 - [ ] xlsx/csv 동시 지원 기간 운영
 - [ ] 운영 가이드에서 CSV-only 전환
+
+## Sprint 7 - Drizzle Transition
+- [ ] Drizzle migration 기준으로 schema 단일화
+- [ ] 조회 API(`residual-values`, `changes`) Drizzle 전환
+- [ ] 업로드 적재 경로 Drizzle 전환
+- [ ] Supabase SDK direct query 최소화
 
 ## API Draft
 1. `POST /api/uploads`
