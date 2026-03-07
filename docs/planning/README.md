@@ -1,0 +1,62 @@
+# MR CHA Dashboard Planning
+
+## 1) Goal
+- 운영자용 대시보드에서 `Lease`/`Rent` 잔존가치 데이터를 조회/검색한다.
+- 세부모델 기준 최고 잔존가치(Top value)를 빠르게 확인한다.
+- 업로드 버전 간 잔존가치 변동(상승/하락)을 추적한다.
+
+## 2) Current Source (as-is)
+- 입력 파일: `cartner_residual_values_report.xlsx`
+- 확인된 시트:
+  - `Lease Raw`
+  - `Rent Raw`
+  - `Trim Summary` (참고용)
+  - `Finance Summary` (참고용)
+- 현재 `Raw` 시트 기본 컬럼:
+  - `A 제조사`
+  - `B 모델`
+  - `C 라인업`
+  - `D 세부모델`
+  - `E 기간(개월)`
+  - `F 약정 거리`
+  - `G 금융사`
+  - `H 잔존가치%`
+
+## 3) Target Stack
+- Runtime: Bun
+- Frontend: React
+- API: Hono (Cloudflare Pages Functions)
+- BaaS: Supabase (Postgres/Auth/Storage)
+- Deploy: Cloudflare Pages + Functions
+
+## 4) Phased Plan
+1. Phase 0 - Specification Freeze
+- 데이터 컬럼/타입/정규화 규칙 확정
+- 업로드 시 중복 키 규칙 확정
+- 변동 계산 기준(직전 업로드 대비) 확정
+
+2. Phase 1 - MVP Ingestion + Query
+- xlsx 업로드/파싱 (`Lease Raw`, `Rent Raw`)
+- Supabase 적재
+- 조회 API + 기본 검색/필터 UI
+
+3. Phase 2 - Best Value + Change Tracking
+- 세부모델별 최고 잔존가치 뷰
+- 업로드 간 변화량 계산/저장
+- 변동 리포트 UI(상승/하락/변동폭)
+
+4. Phase 3 - Ops Hardening
+- CSV 표준 업로드 전환
+- 데이터 검증 리포트/실패 행 다운로드
+- 관리자 권한/RLS/감사 로그 강화
+
+## 5) Success Criteria
+- Raw 업로드 후 1분 내 조회 가능
+- 세부모델 최고 잔존가치 조회가 1초 내 응답
+- 직전 버전 대비 변동 리포트 자동 생성
+- Lease/Rent 모두 동일 UX로 조회 가능
+
+## 6) Decision Log (initial)
+- 초기 입력은 xlsx를 지원한다.
+- 운영 표준 업로드 포맷은 CSV(UTF-8)로 전환한다.
+- 변동 계산은 `직전 업로드 버전` 대비를 기본으로 한다.

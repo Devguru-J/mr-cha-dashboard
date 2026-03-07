@@ -1,0 +1,16 @@
+{
+  "name": "mr-cha-dashboard",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "functions/*"
+  ],
+  "scripts": {
+    "dev:web": "npm --prefix apps/web run dev",
+    "dev:api": "npm --prefix functions/api run dev",
+    "build:web": "npm --prefix apps/web run build",
+    "check:api": "npm --prefix functions/api run check",
+    "deploy": "npm run build:web && npm --prefix functions/api run deploy"
+  }
+}

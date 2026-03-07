@@ -1,0 +1,23 @@
+{
+  "name": "api",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Cloudflare Pages Functions API powered by Hono",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler pages dev ../../apps/web --functions ../ --compatibility-date=2026-03-07",
+    "check": "tsc --noEmit",
+    "deploy": "wrangler pages deploy ../../apps/web/dist --project-name=mr-cha-dashboard --branch=main --commit-dirty=true"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "hono": "^4.12.5"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260307.1",
+    "typescript": "^5.9.3",
+    "wrangler": "^4.71.0"
+  }
+}
