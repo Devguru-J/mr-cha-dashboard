@@ -7,10 +7,11 @@
     "functions/*"
   ],
   "scripts": {
-    "dev:web": "npm --prefix apps/web run dev",
-    "dev:api": "npm --prefix functions/api run dev",
-    "build:web": "npm --prefix apps/web run build",
-    "check:api": "npm --prefix functions/api run check",
-    "deploy": "npm run build:web && npm --prefix functions/api run deploy"
+    "dev": "bun run dev:web & bun run dev:api & wait",
+    "dev:web": "bun run --cwd apps/web dev",
+    "dev:api": "bun run --cwd functions/api dev",
+    "build:web": "bun run --cwd apps/web build",
+    "check:api": "bun run --cwd functions/api check",
+    "deploy": "bun run build:web && bun run --cwd functions/api deploy"
   }
 }

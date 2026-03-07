@@ -50,16 +50,31 @@
 - 데이터 검증 리포트/실패 행 다운로드
 - 관리자 권한/RLS/감사 로그 강화
 
-## 5) Success Criteria
+## 5) Current Build Status (2026-03-07)
+- 업로드: `.xlsx` 업로드/파싱/중복처리/DB 적재 동작
+- 조회: `GET /api/residual-values` 필터/정렬/페이지네이션 동작
+- 최고값: `GET /api/best-values` 동작
+- 변동: `GET /api/changes` 월 자동 선택 + 서버 필터/정렬/페이지네이션 동작
+- 자동완성: `GET /api/suggestions`(제조사/모델/금융사) 추가
+- 성능: 인덱스 마이그레이션 적용 완료
+- Drizzle: 기본 설정/스키마 파일 추가 완료(점진적 전환 시작)
+
+## 6) Success Criteria
 - Raw 업로드 후 1분 내 조회 가능
 - 세부모델 최고 잔존가치 조회가 1초 내 응답
 - 직전 버전 대비 변동 리포트 자동 생성
 - Lease/Rent 모두 동일 UX로 조회 가능
 
-## 6) Decision Log (initial)
+## 7) Decision Log (initial)
 - 초기 입력은 xlsx를 지원한다.
 - 운영 표준 업로드 포맷은 CSV(UTF-8)로 전환한다.
 - 변동 계산은 `직전 업로드 버전` 대비를 기본으로 한다.
 - Supabase 미준비 기간에는 API가 mock dataset으로 fallback 동작한다.
 - RLS Role은 ENUM 3단계로 고정한다: `super`(admin), `manager`(실무자), `dealer`(딜러사).
 - `dealer`는 기본 read 권한 + 딜러 할인 데이터 페이지에 한해 write 권한을 가진다.
+
+## 8) Next Action Order
+1. Auth + RLS 정책 실제 적용 (`super/manager/dealer`)
+2. `dealer_discounts` API/UI 구현 (dealer write 한정)
+3. Drizzle 기반 DB 접근 점진 전환 (핵심 조회 API 우선)
+4. CSV 업로드 경로 추가 + 운영 가이드 전환

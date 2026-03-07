@@ -5,20 +5,31 @@
   "description": "Cloudflare Pages Functions API powered by Hono",
   "type": "module",
   "scripts": {
-    "dev": "wrangler pages dev ../../apps/web --functions ../ --compatibility-date=2026-03-07",
+    "dev": "bun run dev-server.ts",
+    "dev:pages": "wrangler --cwd ../.. pages dev apps/web --compatibility-date=2026-03-07",
     "check": "tsc --noEmit",
-    "deploy": "wrangler pages deploy ../../apps/web/dist --project-name=mr-cha-dashboard --branch=main --commit-dirty=true"
+    "deploy": "wrangler --cwd ../.. pages deploy apps/web/dist --project-name=mr-cha-dashboard --branch=main --commit-dirty=true",
+    "db:generate": "drizzle-kit generate --config=drizzle.config.ts",
+    "db:push": "drizzle-kit push --config=drizzle.config.ts",
+    "db:studio": "drizzle-kit studio --config=drizzle.config.ts"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@hono/node-server": "^1.19.11",
     "@supabase/supabase-js": "^2.98.0",
+    "dotenv": "^17.3.1",
+    "drizzle-kit": "^0.31.9",
+    "drizzle-orm": "^0.45.1",
     "hono": "^4.12.5",
+    "postgres": "^3.4.8",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260307.1",
+    "@types/node": "^25.3.5",
+    "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "wrangler": "^4.71.0"
   }

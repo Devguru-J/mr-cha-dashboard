@@ -120,3 +120,20 @@
 - 인코딩: UTF-8
 - 날짜: `YYYY-MM`
 - 숫자 필드에는 단위 문자(`%`, `km`, `만`) 금지
+
+## 10) Query/API Spec (Current)
+1. `GET /api/residual-values`
+- filters: `sourceType`, `snapshotMonth`, `maker`, `model`, `finance`, `termMonths`, `annualMileageKm`, `q`
+- paging: `page`, `pageSize`
+- sorting: `sortBy`, `sortOrder`
+
+2. `GET /api/changes`
+- filters: `sourceType`, `snapshotMonth`, `previousSnapshotMonth`
+- server filter: `direction=all|up|down`, `minAbsDeltaPp`
+- paging: `page`, `pageSize`
+- sorting: `sortBy=abs|delta_desc|delta_asc`
+
+3. `GET /api/suggestions`
+- purpose: 필터 입력 자동완성
+- fields: `field=maker_name|model_name|finance_name`
+- filters: `sourceType`, `snapshotMonth`, `q`, `limit`

@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>MR CHA Dashboard - Best Residual Values</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#0f49bd",
+                        "background-light": "#f6f6f8",
+                        "background-dark": "#101622",
+                    },
+                    fontFamily: {
+                        "display": ["Manrope"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            font-family: 'Manrope', sans-serif;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 font-display">
+<div class="flex h-screen overflow-hidden">
+<!-- Sidebar -->
+<aside class="w-64 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col">
+<div class="p-6 flex flex-col gap-8">
+<div class="flex items-center gap-3">
+<div class="h-10 w-10 rounded-full bg-primary flex items-center justify-center text-white">
+<span class="material-symbols-outlined">directions_car</span>
+</div>
+<div class="flex flex-col">
+<h1 class="text-slate-900 dark:text-white text-base font-bold leading-none">MR CHA</h1>
+<p class="text-slate-500 dark:text-slate-400 text-xs font-medium">Admin Dashboard</p>
+</div>
+</div>
+<nav class="flex flex-col gap-1">
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="text-sm font-semibold">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg bg-primary text-white shadow-md shadow-primary/20" href="#">
+<span class="material-symbols-outlined">trending_up</span>
+<span class="text-sm font-semibold">Residual Values</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" href="#">
+<span class="material-symbols-outlined">bar_chart</span>
+<span class="text-sm font-semibold">Market Analysis</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" href="#">
+<span class="material-symbols-outlined">handshake</span>
+<span class="text-sm font-semibold">Finance Partners</span>
+</a>
+<div class="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="text-sm font-semibold">Settings</span>
+</a>
+</div>
+</nav>
+</div>
+<div class="mt-auto p-6">
+<div class="p-4 rounded-xl bg-primary/5 border border-primary/10">
+<p class="text-xs font-bold text-primary uppercase tracking-wider mb-1">System Status</p>
+<div class="flex items-center gap-2">
+<span class="h-2 w-2 rounded-full bg-green-500"></span>
+<span class="text-xs text-slate-600 dark:text-slate-400">All feeds active</span>
+</div>
+</div>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="flex-1 flex flex-col overflow-y-auto">
+<!-- Header -->
+<header class="h-16 border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md flex items-center justify-between px-8 sticky top-0 z-10">
+<div class="flex items-center gap-4">
+<h2 class="text-lg font-bold text-slate-900 dark:text-white">Best Residual Values</h2>
+</div>
+<div class="flex items-center gap-6">
+<div class="relative w-64">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">search</span>
+<input class="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-lg pl-10 pr-4 py-2 text-sm focus:ring-2 focus:ring-primary/20" placeholder="Search models or terms..." type="text"/>
+</div>
+<div class="flex items-center gap-2">
+<button class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<div class="h-8 w-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center overflow-hidden">
+<img alt="User" class="h-full w-full object-cover" data-alt="User avatar profile picture" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDY_Rr7gYRD7nlcek2t-x7Shd4tr5q2-e_E2hU-Z1qiGMdx-sFSg94rJB5JBaEMVCmDo1vUNjvTqmSdXrjf1ekc8R_ARAQFEo7OMJK3Fj1oivdgRQKU7bryQHEurKnLbYUI5fyUSccD8MW_eofinQzsa542W66zig9o6E3ehQnQH-1I1wMsYjoC7zxMEOjuvvld6eMUbEcwTrXNevIR1U7OKzsPk3gVRQYF8-j60ID1e0MaHw9962ah2X6ZHY7hWTJ1F8BUbsj80Q"/>
+</div>
+</div>
+</div>
+</header>
+<!-- Dashboard Content -->
+<div class="p-8 max-w-7xl mx-auto w-full">
+<div class="flex flex-col gap-8">
+<!-- Hero Stats Section -->
+<div class="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+<div>
+<h1 class="text-4xl font-black text-slate-900 dark:text-white tracking-tight">Market Leaders</h1>
+<p class="text-slate-500 dark:text-slate-400 mt-1">Real-time analysis of highest performing vehicle models and residual value retention.</p>
+</div>
+<button class="flex items-center gap-2 px-4 py-2.5 bg-primary text-white rounded-lg font-bold text-sm shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all">
+<span class="material-symbols-outlined text-[20px]">download</span>
+                        Export Report
+                    </button>
+</div>
+<!-- KPI Grid -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<div class="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+<p class="text-sm font-semibold text-slate-500 dark:text-slate-400">Top Performer (36m/10k)</p>
+<div class="flex items-baseline gap-2 mt-2">
+<span class="text-3xl font-black text-slate-900 dark:text-white">Porsche 911</span>
+<span class="text-green-600 text-sm font-bold flex items-center">
+<span class="material-symbols-outlined text-sm">arrow_upward</span> 2.4%
+                            </span>
+</div>
+<p class="text-xs text-slate-400 mt-1">Carrera S Coupe 2024</p>
+</div>
+<div class="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+<p class="text-sm font-semibold text-slate-500 dark:text-slate-400">Market Avg. Residual</p>
+<div class="flex items-baseline gap-2 mt-2">
+<span class="text-3xl font-black text-slate-900 dark:text-white">64.2%</span>
+<span class="text-red-500 text-sm font-bold flex items-center">
+<span class="material-symbols-outlined text-sm">arrow_downward</span> 0.5%
+                            </span>
+</div>
+<p class="text-xs text-slate-400 mt-1">Across all fuel types</p>
+</div>
+<div class="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+<p class="text-sm font-semibold text-slate-500 dark:text-slate-400">Top Finance Partner</p>
+<div class="flex items-baseline gap-2 mt-2">
+<span class="text-3xl font-black text-slate-900 dark:text-white">Chase Auto</span>
+<span class="text-green-600 text-sm font-bold flex items-center">
+<span class="material-symbols-outlined text-sm">check_circle</span>
+</span>
+</div>
+<p class="text-xs text-slate-400 mt-1">Highest approval &amp; RV retention</p>
+</div>
+</div>
+<!-- Navigation Tabs -->
+<div class="border-b border-slate-200 dark:border-slate-800 flex gap-8">
+<button class="pb-4 text-sm font-bold border-b-2 border-primary text-primary">All Models</button>
+<button class="pb-4 text-sm font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">Luxury High-Line</button>
+<button class="pb-4 text-sm font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">Electric (EV)</button>
+<button class="pb-4 text-sm font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">Performance SUVs</button>
+</div>
+<!-- Data Table -->
+<div class="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800">
+<th class="px-6 py-4 text-xs font-black text-slate-400 uppercase tracking-widest">Detail Model</th>
+<th class="px-6 py-4 text-xs font-black text-slate-400 uppercase tracking-widest">Residual Value</th>
+<th class="px-6 py-4 text-xs font-black text-slate-400 uppercase tracking-widest">Winning Partner</th>
+<th class="px-6 py-4 text-xs font-black text-slate-400 uppercase tracking-widest">Term/Mileage</th>
+<th class="px-6 py-4 text-xs font-black text-slate-400 uppercase tracking-widest">Status</th>
+<th class="px-6 py-4"></th>
+</tr>
+</thead>
+<tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+<!-- Row 1 -->
+<tr class="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+<td class="px-6 py-5">
+<div class="flex items-center gap-4">
+<div class="h-12 w-16 bg-slate-100 dark:bg-slate-800 rounded-lg overflow-hidden flex items-center justify-center">
+<img alt="Porsche" class="object-cover h-full w-full" data-alt="Front view of a silver Porsche sports car" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB7C5lJ0yn77HTv_6wxYCPWTVYvDtMlIwr3UUvv6OU981L4RvJG32LQcENbvokAUoonOuV9Tunz0-kOAJ4u8dnWcx2-6khBcjDkf7HZLh0LIdj3MNOVBey8hIFCisFOOsiS-SS7NLh3zhPgjSQfXCD69tQ3C8eCAFg6VoCMumKo40XSTuqMBS2rC40zvPOg_QmuCz32cVOUH3F8GcLm3KqfCMs_vOIJTuDH1FIX6WQ1f-TH-tWMk7ZQqMkd1apoFVmryooKLettOQ"/>
+</div>
+<div>
+<p class="font-bold text-slate-900 dark:text-white">Porsche 911 Carrera S</p>
+<p class="text-xs text-slate-500">MY 2024 • Coupe</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-5">
+<span class="text-lg font-black text-primary">74.5%</span>
+<p class="text-[10px] text-green-600 font-bold uppercase tracking-tight">+1.2% MoM</p>
+</td>
+<td class="px-6 py-5">
+<div class="flex items-center gap-2">
+<div class="h-6 w-6 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center">
+<span class="material-symbols-outlined text-[14px]">account_balance</span>
+</div>
+<span class="text-sm font-semibold text-slate-700 dark:text-slate-300">Porsche Financial</span>
+</div>
+</td>
+<td class="px-6 py-5">
+<div class="flex flex-col">
+<span class="text-sm font-bold text-slate-900 dark:text-white">36 Months</span>
+<span class="text-xs text-slate-500 tracking-wide">10,000 mi/yr</span>
+</div>
+</td>
+<td class="px-6 py-5">
+<span class="px-2.5 py-1 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-[10px] font-black uppercase tracking-widest">Aggressive</span>
+</td>
+<td class="px-6 py-5 text-right">
+<button class="text-slate-400 hover:text-primary transition-colors">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+<td class="px-6 py-5">
+<div class="flex items-center gap-4">
+<div class="h-12 w-16 bg-slate-100 dark:bg-slate-800 rounded-lg overflow-hidden flex items-center justify-center">
+<img alt="BMW" class="object-cover h-full w-full" data-alt="Blue BMW sedan parked on a city street" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBc4ivek9G0vIhKGwZsJ6eYcRhW5bLf8YAWNk3LGyxDW4XucfaWPf_GOa_uzfUdjEqxInJBFBBmlqs02Qz_QSx_TfAK379D80U4gO3qEaDOP-cNOE3oQUJe5f-T47UiDefjsEh7NwsloAhHiOzF58HkwiUH-q12Jt32gj2UOTXA7FV5QdBjQeUz65SOM1FgZfRfNb47Qhs_5AXFSJqdeiim-Q41A13zP40IQCOeKZOa_6abvIMST_cTyWLmTbSCh19hOij0T7RGdw"/>
+</div>
+<div>
+<p class="font-bold text-slate-900 dark:text-white">BMW M4 Competition</p>
+<p class="text-xs text-slate-500">MY 2024 • xDrive</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-5">
+<span class="text-lg font-black text-primary">61.0%</span>
+<p class="text-[10px] text-red-500 font-bold uppercase tracking-tight">-0.4% MoM</p>
+</td>
+<td class="px-6 py-5">
+<div class="flex items-center gap-2">
+<div class="h-6 w-6 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center">
+<span class="material-symbols-outlined text-[14px]">account_balance</span>
+</div>
+<span class="text-sm font-semibold text-slate-700 dark:text-slate-300">Chase Auto</span>
+</div>
+</td>
+<td class="px-6 py-5">
+<div class="flex flex-col">
+<span class="text-sm font-bold text-slate-900 dark:text-white">42 Months</span>
+<span class="text-xs text-slate-500 tracking-wide">12,000 mi/yr</span>
+</div>
+</td>
+<td class="px-6 py-5">
+<span class="px-2.5 py-1 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-[10px] font-black uppercase tracking-widest">Market</span>
+</td>
+<td class="px-6 py-5 text-right">
+<button class="text-slate-400 hover:text-primary transition-colors">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+<td class="px-6 py-5">
+<div class="flex items-center gap-4">
+<div class="h-12 w-16 bg-slate-100 dark:bg-slate-800 rounded-lg overflow-hidden flex items-center justify-center">
+<img alt="Tesla" class="object-cover h-full w-full" data-alt="White Tesla Model S side profile" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCx51M2qKHFZ5qJUz-hb0fWL3trQ-qfVe9p8g70AcAPiuhPkzvDoQP_5yT-AcxlJgBASXHoz9dxv1Jq5uS94FMfq72k-AlzmM1q6ZFl4ioQpQMlvFCcLXy6KxlQ2r4fuj-jVUJ1kAw7LQYWFyIDC8nuQW1KyVLzeSJG0t53cb-1pgQY_a9kq26aeL9L9fVLrClKhv3OPHHqGec1TQMhzufeF-PvRCPZAR5tC3WnS3kI_lWciYHNecnC2IkwyP2wSAdZe-Lm7_6X8g"/>
+</div>
+<div>
+<p class="font-bold text-slate-900 dark:text-white">Tesla Model S Plaid</p>
+<p class="text-xs text-slate-500">MY 2024 • Electric</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-5">
+<span class="text-lg font-black text-primary">54.2%</span>
+<p class="text-[10px] text-slate-400 font-bold uppercase tracking-tight">Stable</p>
+</td>
+<td class="px-6 py-5">
+<div class="flex items-center gap-2">
+<div class="h-6 w-6 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center">
+<span class="material-symbols-outlined text-[14px]">account_balance</span>
+</div>
+<span class="text-sm font-semibold text-slate-700 dark:text-slate-300">Wells Fargo</span>
+</div>
+</td>
+<td class="px-6 py-5">
+<div class="flex flex-col">
+<span class="text-sm font-bold text-slate-900 dark:text-white">36 Months</span>
+<span class="text-xs text-slate-500 tracking-wide">10,000 mi/yr</span>
+</div>
+</td>
+<td class="px-6 py-5">
+<span class="px-2.5 py-1 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-[10px] font-black uppercase tracking-widest">Conservative</span>
+</td>
+<td class="px-6 py-5 text-right">
+<button class="text-slate-400 hover:text-primary transition-colors">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</td>
+</tr>
+<!-- Row 4 -->
+<tr class="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+<td class="px-6 py-5">
+<div class="flex items-center gap-4">
+<div class="h-12 w-16 bg-slate-100 dark:bg-slate-800 rounded-lg overflow-hidden flex items-center justify-center">
+<img alt="Mercedes" class="object-cover h-full w-full" data-alt="Black Mercedes-Benz G-Wagon in a studio" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAsNEnDeD4l44XmVgXpSxxpu-u9ETJjqMY9gW8UeZk3sGPC7KCO02JWJzaZbZ7kLbpO_qK_kazquM8-dIrXDpRIJ0Lv4x1JfrRXQztlRZtD5SOhs5npSe5WWaZgx5xGHa0iDD1AEf05XYVwtyV6VdfPntXD0MdTypBd7W0F2KrlW4jyYQbvXI1KA3orA24nXNHZxohIs7C97I7X8FnMVPniuob8NkvgIOe0QsxMH3EWqM7C1eaTJxA1Ba5NTwXBlrf0HGhHI5fD8A"/>
+</div>
+<div>
+<p class="font-bold text-slate-900 dark:text-white">Mercedes G-Class 550</p>
+<p class="text-xs text-slate-500">MY 2024 • SUV</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-5">
+<span class="text-lg font-black text-primary">69.8%</span>
+<p class="text-[10px] text-green-600 font-bold uppercase tracking-tight">+0.8% MoM</p>
+</td>
+<td class="px-6 py-5">
+<div class="flex items-center gap-2">
+<div class="h-6 w-6 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center">
+<span class="material-symbols-outlined text-[14px]">account_balance</span>
+</div>
+<span class="text-sm font-semibold text-slate-700 dark:text-slate-300">MB Financial</span>
+</div>
+</td>
+<td class="px-6 py-5">
+<div class="flex flex-col">
+<span class="text-sm font-bold text-slate-900 dark:text-white">36 Months</span>
+<span class="text-xs text-slate-500 tracking-wide">7,500 mi/yr</span>
+</div>
+</td>
+<td class="px-6 py-5">
+<span class="px-2.5 py-1 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-[10px] font-black uppercase tracking-widest">Aggressive</span>
+</td>
+<td class="px-6 py-5 text-right">
+<button class="text-slate-400 hover:text-primary transition-colors">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</td>
+</tr>
+</tbody>
+</table>
+<div class="bg-slate-50 dark:bg-slate-800/50 px-6 py-4 flex items-center justify-between border-t border-slate-200 dark:border-slate-800">
+<p class="text-xs text-slate-500 font-medium tracking-wide uppercase">Showing 1-4 of 1,240 Models</p>
+<div class="flex gap-2">
+<button class="px-3 py-1 text-xs font-bold border border-slate-200 dark:border-slate-700 rounded bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:bg-slate-100">Previous</button>
+<button class="px-3 py-1 text-xs font-bold border border-primary/20 rounded bg-primary text-white">Next</button>
+</div>
+</div>
+</div>
+<!-- Footer Summary -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
+<div class="bg-gradient-to-br from-primary to-blue-800 p-8 rounded-2xl text-white relative overflow-hidden">
+<div class="relative z-10">
+<h3 class="text-2xl font-black mb-2">Finance Market Outlook</h3>
+<p class="text-blue-100 text-sm max-w-md">Lenders are currently showing 12% higher residual value confidence in performance SUVs compared to Q3 2023. Porsche remains the dominant brand for resale certainty.</p>
+<button class="mt-6 px-5 py-2.5 bg-white text-primary rounded-lg font-bold text-sm hover:bg-blue-50 transition-colors">View Details</button>
+</div>
+<span class="material-symbols-outlined absolute -bottom-8 -right-8 text-[160px] text-white/10 rotate-12">insights</span>
+</div>
+<div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6">
+<h3 class="text-sm font-black uppercase tracking-widest text-slate-400 mb-6">Partner Retention Rankings</h3>
+<div class="space-y-4">
+<div class="flex items-center gap-4">
+<span class="text-xs font-black text-slate-400 w-4">01</span>
+<div class="flex-1">
+<div class="flex justify-between mb-1">
+<span class="text-sm font-bold text-slate-900 dark:text-white">Chase Auto</span>
+<span class="text-sm font-bold text-primary">94.2%</span>
+</div>
+<div class="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+<div class="h-full bg-primary rounded-full" style="width: 94%"></div>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<span class="text-xs font-black text-slate-400 w-4">02</span>
+<div class="flex-1">
+<div class="flex justify-between mb-1">
+<span class="text-sm font-bold text-slate-900 dark:text-white">Porsche Financial</span>
+<span class="text-sm font-bold text-primary">89.8%</span>
+</div>
+<div class="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+<div class="h-full bg-primary rounded-full" style="width: 89%"></div>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<span class="text-xs font-black text-slate-400 w-4">03</span>
+<div class="flex-1">
+<div class="flex justify-between mb-1">
+<span class="text-sm font-bold text-slate-900 dark:text-white">Wells Fargo</span>
+<span class="text-sm font-bold text-primary">82.5%</span>
+</div>
+<div class="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+<div class="h-full bg-primary rounded-full" style="width: 82%"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>

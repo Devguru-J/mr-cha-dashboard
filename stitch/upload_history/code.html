@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>MR CHA Dashboard - Upload History</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#0f49bd",
+                        "background-light": "#f6f6f8",
+                        "background-dark": "#101622",
+                    },
+                    fontFamily: {
+                        "display": ["Manrope"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100">
+<div class="flex h-screen overflow-hidden">
+<!-- Side Navigation -->
+<aside class="w-64 flex flex-col border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+<div class="p-6 flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined font-bold">data_object</span>
+</div>
+<div>
+<h1 class="text-slate-900 dark:text-white font-bold text-lg leading-tight">MR CHA</h1>
+<p class="text-xs text-slate-500 font-medium uppercase tracking-wider">Data Admin</p>
+</div>
+</div>
+<nav class="flex-1 px-4 py-4 space-y-1">
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined text-xl">dashboard</span>
+<span class="text-sm font-semibold">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 bg-primary/10 text-primary rounded-lg" href="#">
+<span class="material-symbols-outlined text-xl">history</span>
+<span class="text-sm font-semibold">Upload History</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined text-xl">cloud_upload</span>
+<span class="text-sm font-semibold">Data Ingestion</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined text-xl">bar_chart</span>
+<span class="text-sm font-semibold">Reports</span>
+</a>
+<div class="pt-4 pb-2">
+<p class="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-[0.15em]">Support</p>
+</div>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined text-xl">settings</span>
+<span class="text-sm font-semibold">Settings</span>
+</a>
+</nav>
+<div class="p-4 border-t border-slate-200 dark:border-slate-800">
+<button class="w-full bg-primary hover:bg-primary/90 text-white flex items-center justify-center gap-2 py-2.5 rounded-lg font-bold text-sm shadow-lg shadow-primary/20 transition-all">
+<span class="material-symbols-outlined text-lg">add</span>
+<span>New Upload</span>
+</button>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="flex-1 flex flex-col overflow-y-auto">
+<!-- Header -->
+<header class="h-16 border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md px-8 flex items-center justify-between sticky top-0 z-10">
+<div class="flex items-center gap-4">
+<h2 class="text-lg font-bold text-slate-900 dark:text-white">Ingestion Tracking</h2>
+</div>
+<div class="flex items-center gap-6">
+<div class="relative hidden md:block">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xl">search</span>
+<input class="pl-10 pr-4 py-1.5 bg-slate-100 dark:bg-slate-800 border-none rounded-lg text-sm focus:ring-2 focus:ring-primary w-64" placeholder="Search logs..." type="text"/>
+</div>
+<div class="flex items-center gap-2">
+<button class="w-10 h-10 rounded-lg flex items-center justify-center text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors relative">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-2.5 right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white dark:border-slate-900"></span>
+</button>
+<div class="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden border border-slate-300 dark:border-slate-600">
+<img alt="User" class="w-full h-full object-cover" data-alt="Avatar of user named Mr Cha" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBPRZGW6rZgJ5KOOiqeTc4aXerbZYhFH367AOSY5dG_P4Oge2bEVk1gVjGv-gbC_q_jDSyx7ynibLsWMjH_IQFN_prrdLhfGxAx5DgTidpyRLzh_he2PbXBNaF_7PV4JDOCEPtlbr2KLE1nhGU1JgzQtt5BUWU10LPPE_-Mn1-Yioh0XeKuh4qH9-xjvcV5YSXOiB5QwCVEjM0IlttwlhgniNcMRYDuTWREBi8Bhccf0k-XrXGIrtNpQeJF4VOLYuTRmuEsJG_UaQ"/>
+</div>
+</div>
+</div>
+</header>
+<div class="p-8 space-y-8">
+<!-- Page Title & Stats -->
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
+<div>
+<h1 class="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">Data Ingestion History</h1>
+<p class="text-slate-500 dark:text-slate-400 mt-1">Review the status of automated and manual data synchronizations.</p>
+</div>
+<div class="flex gap-3">
+<button class="px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-bold hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-2 transition-colors bg-white dark:bg-slate-900">
+<span class="material-symbols-outlined text-lg">filter_list</span>
+                            Filter
+                        </button>
+<button class="px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-bold hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-2 transition-colors bg-white dark:bg-slate-900">
+<span class="material-symbols-outlined text-lg">refresh</span>
+                            Refresh
+                        </button>
+</div>
+</div>
+<!-- Metrics -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+<div class="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+<div class="flex items-center justify-between mb-2">
+<span class="text-slate-500 text-sm font-medium">Total Uploads</span>
+<span class="material-symbols-outlined text-primary bg-primary/10 p-1.5 rounded-lg">file_upload</span>
+</div>
+<div class="flex items-baseline gap-2">
+<span class="text-2xl font-bold">1,284</span>
+<span class="text-xs font-bold text-emerald-500">+12%</span>
+</div>
+</div>
+<div class="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+<div class="flex items-center justify-between mb-2">
+<span class="text-slate-500 text-sm font-medium">Success Rate</span>
+<span class="material-symbols-outlined text-emerald-500 bg-emerald-500/10 p-1.5 rounded-lg">check_circle</span>
+</div>
+<div class="flex items-baseline gap-2">
+<span class="text-2xl font-bold">98.2%</span>
+<span class="text-xs font-bold text-emerald-500">+0.4%</span>
+</div>
+</div>
+<div class="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+<div class="flex items-center justify-between mb-2">
+<span class="text-slate-500 text-sm font-medium">Total Rows</span>
+<span class="material-symbols-outlined text-blue-500 bg-blue-500/10 p-1.5 rounded-lg">database</span>
+</div>
+<div class="flex items-baseline gap-2">
+<span class="text-2xl font-bold">4.2M</span>
+<span class="text-xs font-bold text-emerald-500">+15%</span>
+</div>
+</div>
+<div class="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+<div class="flex items-center justify-between mb-2">
+<span class="text-slate-500 text-sm font-medium">Failed Rows</span>
+<span class="material-symbols-outlined text-rose-500 bg-rose-500/10 p-1.5 rounded-lg">error_outline</span>
+</div>
+<div class="flex items-baseline gap-2">
+<span class="text-2xl font-bold">12.4K</span>
+<span class="text-xs font-bold text-rose-500">-5%</span>
+</div>
+</div>
+</div>
+<!-- Data Table -->
+<div class="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800">
+<th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest">File Name</th>
+<th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest">Snapshot Month</th>
+<th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest">Processed Rows</th>
+<th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest">Failed Rows</th>
+<th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest">Status</th>
+<th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest">Uploaded Time</th>
+<th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest text-right">Actions</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+<tr class="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-blue-500">csv</span>
+<span class="text-sm font-semibold text-slate-900 dark:text-white">Q4_revenue_final.csv</span>
+</div>
+</td>
+<td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">Oct 2023</td>
+<td class="px-6 py-4 text-sm font-medium text-slate-700 dark:text-slate-300">45,000</td>
+<td class="px-6 py-4 text-sm font-medium text-slate-700 dark:text-slate-300">0</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/30">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                            Success
+                                        </span>
+</td>
+<td class="px-6 py-4 text-sm text-slate-500 dark:text-slate-400 whitespace-nowrap">2023-11-01 10:30</td>
+<td class="px-6 py-4 text-right">
+<button class="text-primary hover:underline text-sm font-bold">View Details</button>
+</td>
+</tr>
+<tr class="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-green-500">description</span>
+<span class="text-sm font-semibold text-slate-900 dark:text-white">monthly_census_v2.xlsx</span>
+</div>
+</td>
+<td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">Oct 2023</td>
+<td class="px-6 py-4 text-sm font-medium text-slate-700 dark:text-slate-300">12,200</td>
+<td class="px-6 py-4 text-sm font-medium text-amber-600">450</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400 border border-amber-200 dark:border-amber-500/30">
+<span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                                            Partial
+                                        </span>
+</td>
+<td class="px-6 py-4 text-sm text-slate-500 dark:text-slate-400 whitespace-nowrap">2023-11-01 09:15</td>
+<td class="px-6 py-4 text-right">
+<button class="text-primary hover:underline text-sm font-bold">View Errors</button>
+</td>
+</tr>
+<tr class="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-rose-500">error</span>
+<span class="text-sm font-semibold text-slate-900 dark:text-white">claims_data_export.csv</span>
+</div>
+</td>
+<td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">Sept 2023</td>
+<td class="px-6 py-4 text-sm font-medium text-slate-700 dark:text-slate-300">0</td>
+<td class="px-6 py-4 text-sm font-medium text-rose-600 font-bold">8,500</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-400 border border-rose-200 dark:border-rose-500/30">
+<span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                                            Failed
+                                        </span>
+</td>
+<td class="px-6 py-4 text-sm text-slate-500 dark:text-slate-400 whitespace-nowrap">2023-10-31 16:45</td>
+<td class="px-6 py-4 text-right">
+<button class="text-rose-600 hover:underline text-sm font-bold">View Errors</button>
+</td>
+</tr>
+<tr class="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-blue-500">csv</span>
+<span class="text-sm font-semibold text-slate-900 dark:text-white">provider_network_list.csv</span>
+</div>
+</td>
+<td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">Sept 2023</td>
+<td class="px-6 py-4 text-sm font-medium text-slate-700 dark:text-slate-300">32,000</td>
+<td class="px-6 py-4 text-sm font-medium text-slate-700 dark:text-slate-300">0</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/30">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                            Success
+                                        </span>
+</td>
+<td class="px-6 py-4 text-sm text-slate-500 dark:text-slate-400 whitespace-nowrap">2023-10-31 14:20</td>
+<td class="px-6 py-4 text-right">
+<button class="text-primary hover:underline text-sm font-bold">View Details</button>
+</td>
+</tr>
+<tr class="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-blue-500">csv</span>
+<span class="text-sm font-semibold text-slate-900 dark:text-white">member_enrollment_final.csv</span>
+</div>
+</td>
+<td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">Aug 2023</td>
+<td class="px-6 py-4 text-sm font-medium text-slate-700 dark:text-slate-300">150,000</td>
+<td class="px-6 py-4 text-sm font-medium text-amber-600">120</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400 border border-amber-200 dark:border-amber-500/30">
+<span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                                            Partial
+                                        </span>
+</td>
+<td class="px-6 py-4 text-sm text-slate-500 dark:text-slate-400 whitespace-nowrap">2023-10-30 11:05</td>
+<td class="px-6 py-4 text-right">
+<button class="text-primary hover:underline text-sm font-bold">View Errors</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="px-6 py-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/30 flex items-center justify-between">
+<span class="text-xs font-bold text-slate-500 uppercase tracking-widest">Showing 5 of 1,284 results</span>
+<div class="flex gap-2">
+<button class="w-8 h-8 flex items-center justify-center rounded border border-slate-200 dark:border-slate-700 text-slate-500 hover:bg-white transition-colors">
+<span class="material-symbols-outlined text-lg">chevron_left</span>
+</button>
+<button class="w-8 h-8 flex items-center justify-center rounded border border-slate-200 dark:border-slate-700 text-slate-500 hover:bg-white transition-colors">
+<span class="material-symbols-outlined text-lg">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Right Side Drawer (Error Details - Hidden by default but structure visible for mockup) -->
+<div class="fixed inset-y-0 right-0 w-96 bg-white dark:bg-slate-900 shadow-2xl border-l border-slate-200 dark:border-slate-800 z-50 transform translate-x-0 transition-transform duration-300">
+<div class="h-16 flex items-center justify-between px-6 border-b border-slate-200 dark:border-slate-800">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-rose-500">warning</span>
+<h3 class="font-bold text-slate-900 dark:text-white">Validation Errors</h3>
+</div>
+<button class="text-slate-400 hover:text-slate-600 transition-colors">
+<span class="material-symbols-outlined">close</span>
+</button>
+</div>
+<div class="p-6 space-y-6">
+<div class="bg-rose-50 dark:bg-rose-500/10 p-4 rounded-lg border border-rose-200 dark:border-rose-500/20">
+<p class="text-xs font-bold text-rose-600 dark:text-rose-400 uppercase tracking-wider mb-1">File Affected</p>
+<p class="text-sm font-semibold text-slate-900 dark:text-white">claims_data_export.csv</p>
+</div>
+<div class="space-y-4">
+<div class="flex justify-between items-center">
+<h4 class="text-xs font-bold text-slate-500 uppercase tracking-widest">Error Log (8,500 total)</h4>
+<button class="text-xs text-primary font-bold hover:underline">Download CSV</button>
+</div>
+<div class="space-y-3">
+<div class="p-4 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
+<div class="flex items-start justify-between mb-2">
+<span class="text-xs font-bold text-slate-400">Row: 42</span>
+<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-700 uppercase">Critical</span>
+</div>
+<p class="text-sm text-slate-700 dark:text-slate-300 font-medium">Missing required field: <span class="bg-slate-200 dark:bg-slate-700 px-1 rounded">CLAIM_ID</span></p>
+</div>
+<div class="p-4 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
+<div class="flex items-start justify-between mb-2">
+<span class="text-xs font-bold text-slate-400">Row: 105</span>
+<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700 uppercase">Warning</span>
+</div>
+<p class="text-sm text-slate-700 dark:text-slate-300 font-medium">Invalid date format in <span class="bg-slate-200 dark:bg-slate-700 px-1 rounded">SERVICE_DATE</span>. Expected YYYY-MM-DD.</p>
+</div>
+<div class="p-4 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
+<div class="flex items-start justify-between mb-2">
+<span class="text-xs font-bold text-slate-400">Row: 218</span>
+<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-700 uppercase">Critical</span>
+</div>
+<p class="text-sm text-slate-700 dark:text-slate-300 font-medium">Duplicate entry detected for key <span class="bg-slate-200 dark:bg-slate-700 px-1 rounded">TRANSACTION_UID</span>.</p>
+</div>
+<div class="p-4 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
+<div class="flex items-start justify-between mb-2">
+<span class="text-xs font-bold text-slate-400">Row: 432</span>
+<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-700 uppercase">Critical</span>
+</div>
+<p class="text-sm text-slate-700 dark:text-slate-300 font-medium">Member ID <span class="bg-slate-200 dark:bg-slate-700 px-1 rounded">M-9902</span> not found in master database.</p>
+</div>
+</div>
+</div>
+<div class="pt-4">
+<button class="w-full py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-lg font-bold text-sm shadow-lg transition-all">
+                        Resolve All &amp; Re-upload
+                    </button>
+</div>
+</div>
+</div>
+</div>
+</body></html>

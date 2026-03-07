@@ -4,6 +4,17 @@ import './App.css'
 
 type SourceType = 'lease' | 'rent'
 type MenuKey = 'home' | 'explorer' | 'best' | 'changes' | 'uploads'
+type ResidualSortBy =
+  | 'residual_value_percent'
+  | 'maker_name'
+  | 'model_name'
+  | 'lineup_name'
+  | 'detail_model_name'
+  | 'term_months'
+  | 'annual_mileage_km'
+  | 'finance_name'
+  | 'snapshot_month'
+type ResidualSortOrder = 'asc' | 'desc'
 
 type ResidualValueRow = {
   id: number
@@ -41,6 +52,8 @@ type FilterState = {
   termMonths: string
   annualMileageKm: string
   pageSize: number
+  sortBy: ResidualSortBy
+  sortOrder: ResidualSortOrder
 }
 
 type ChangeRow = {
@@ -52,6 +65,13 @@ type ChangeRow = {
   current_percent: number
   delta_pp: number
   snapshot_month: string
+}
+
+type ChangeFilterState = {
+  direction: 'all' | 'up' | 'down'
+  sortBy: 'abs' | 'delta_desc' | 'delta_asc'
+  minAbsDeltaPp: string
+  pageSize: number
 }
 
 type UploadHistoryRow = {
@@ -73,6 +93,15 @@ const DEFAULT_FILTERS: FilterState = {
   snapshotMonth: '',
   termMonths: '',
   annualMileageKm: '',
+  pageSize: 50,
+  sortBy: 'residual_value_percent',
+  sortOrder: 'desc',
+}
+
+const DEFAULT_CHANGE_FILTERS: ChangeFilterState = {
+  direction: 'all',
+  sortBy: 'abs',
+  minAbsDeltaPp: '',
   pageSize: 50,
 }
 
@@ -97,7 +126,22 @@ function App() {
   const [bestTotal, setBestTotal] = useState(0)
   const [isMockMode, setIsMockMode] = useState(false)
   const [changeRows, setChangeRows] = useState<ChangeRow[]>([])
+  const [changeTotal, setChangeTotal] = useState(0)
+  const [changeFilters, setChangeFilters] = useState<ChangeFilterState>(DEFAULT_CHANGE_FILTERS)
+  const [changePage, setChangePage] = useState(1)
   const [uploadRows, setUploadRows] = useState<UploadHistoryRow[]>([])
+  const [suggestions, setSuggestions] = useState<{
+    maker: string[]
+    model: string[]
+    finance: string[]
+  }>({
+    maker: [],
+    model: [],
+    finance: [],
+  })
+  const [uploading, setUploading] = useState(false)
+  const [uploadMessage, setUploadMessage] = useState<string | null>(null)
+  const [uploadError, setUploadError] = useState<string | null>(null)
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -110,6 +154,10 @@ function App() {
   const averageLease = useMemo(() => getAverage(rows, 'lease'), [rows])
   const averageRent = useMemo(() => getAverage(rows, 'rent'), [rows])
   const biggestDrop = useMemo(() => getBiggestDrop(changeRows), [changeRows])
+  const changeTotalPages = useMemo(() => {
+    const raw = Math.ceil(changeTotal / changeFilters.pageSize)
+    return raw > 0 ? raw : 1
+  }, [changeTotal, changeFilters.pageSize])
 
   useEffect(() => {
     const run = async () => {
@@ -138,12 +186,13 @@ function App() {
         setIsMockMode(Boolean(listData.mockMode))
 
         const [changesRes, uploadsRes] = await Promise.all([
-          fetch(`/api/changes?sourceType=${appliedFilters.sourceType}&limit=50`),
+          fetch(`/api/changes?${buildChangesParams(appliedFilters.sourceType, appliedFilters.snapshotMonth, changeFilters, changePage).toString()}`),
           fetch('/api/uploads?limit=20'),
         ])
         if (changesRes.ok) {
-          const changesData = (await changesRes.json()) as { items?: ChangeRow[] }
+          const changesData = (await changesRes.json()) as { items?: ChangeRow[]; total?: number }
           setChangeRows(changesData.items ?? [])
+          setChangeTotal(changesData.total ?? 0)
         }
         if (uploadsRes.ok) {
           const uploadsData = (await uploadsRes.json()) as { items?: UploadHistoryRow[] }
@@ -156,11 +205,54 @@ function App() {
       }
     }
     void run()
-  }, [appliedFilters, page])
+  }, [appliedFilters, page, changeFilters, changePage])
+
+  useEffect(() => {
+    let cancelled = false
+    const timer = setTimeout(async () => {
+      try {
+        const base = new URLSearchParams()
+        base.set('sourceType', filters.sourceType)
+        base.set('limit', '10')
+        if (filters.snapshotMonth.trim()) base.set('snapshotMonth', filters.snapshotMonth.trim())
+
+        const call = async (field: 'maker_name' | 'model_name' | 'finance_name', q: string) => {
+          if (!q.trim()) return []
+          const params = new URLSearchParams(base)
+          params.set('field', field)
+          params.set('q', q.trim())
+          const res = await fetch(`/api/suggestions?${params.toString()}`)
+          if (!res.ok) return []
+          const data = (await res.json()) as { items?: string[] }
+          return data.items ?? []
+        }
+
+        const [maker, model, finance] = await Promise.all([
+          call('maker_name', filters.maker),
+          call('model_name', filters.model),
+          call('finance_name', filters.finance),
+        ])
+
+        if (!cancelled) {
+          setSuggestions({ maker, model, finance })
+        }
+      } catch {
+        if (!cancelled) {
+          setSuggestions({ maker: [], model: [], finance: [] })
+        }
+      }
+    }, 180)
+
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [filters.sourceType, filters.snapshotMonth, filters.maker, filters.model, filters.finance])
 
   const onSubmit = (e: FormEvent) => {
     e.preventDefault()
     setPage(1)
+    setChangePage(1)
     setAppliedFilters({ ...filters })
   }
 
@@ -168,7 +260,64 @@ function App() {
     const next = { ...filters, sourceType }
     setFilters(next)
     setPage(1)
+    setChangePage(1)
     setAppliedFilters(next)
+  }
+
+  const uploadLeaseFile = async (file: File, snapshotMonth: string) => {
+    setUploading(true)
+    setUploadMessage(null)
+    setUploadError(null)
+
+    try {
+      const form = new FormData()
+      form.append('file', file)
+      form.append('snapshotMonth', snapshotMonth)
+
+      const res = await fetch('/api/uploads', {
+        method: 'POST',
+        body: form,
+      })
+
+      const raw = await res.text()
+      const data = (raw ? safeJsonParse(raw) : null) as
+        | {
+            ok?: boolean
+            message?: string
+            valid_rows?: number
+            invalid_rows?: number
+            mockMode?: boolean
+          }
+        | null
+
+      if (!data) {
+        const hint =
+          res.status === 500
+            ? 'API 서버가 내려가 있거나 프록시 오류일 수 있습니다. dev:api 실행 상태를 확인하세요.'
+            : '응답 본문이 비어 있습니다.'
+        throw new Error(`업로드 응답 파싱 실패 (${res.status}) - ${hint}`)
+      }
+
+      if (!res.ok || !data.ok) {
+        throw new Error(data.message ?? `업로드 실패 (${res.status})`)
+      }
+
+      setUploadMessage(
+        `업로드 성공: 유효 ${Number(data.valid_rows ?? 0).toLocaleString()}행, 오류 ${Number(
+          data.invalid_rows ?? 0,
+        ).toLocaleString()}행${data.mockMode ? ' (mock 모드 저장 없음)' : ''}`,
+      )
+
+      const uploadsRes = await fetch('/api/uploads?limit=20')
+      if (uploadsRes.ok) {
+        const uploadsData = (await uploadsRes.json()) as { items?: UploadHistoryRow[] }
+        setUploadRows(uploadsData.items ?? [])
+      }
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : '업로드 중 오류가 발생했습니다.')
+    } finally {
+      setUploading(false)
+    }
   }
 
   return (
@@ -219,9 +368,24 @@ function App() {
               value={filters.q}
               onChange={(e) => setFilters({ ...filters, q: e.target.value })}
             />
-            <input placeholder="제조사" value={filters.maker} onChange={(e) => setFilters({ ...filters, maker: e.target.value })} />
-            <input placeholder="모델" value={filters.model} onChange={(e) => setFilters({ ...filters, model: e.target.value })} />
-            <input placeholder="금융사" value={filters.finance} onChange={(e) => setFilters({ ...filters, finance: e.target.value })} />
+            <input
+              list="maker-suggestions"
+              placeholder="제조사"
+              value={filters.maker}
+              onChange={(e) => setFilters({ ...filters, maker: e.target.value })}
+            />
+            <input
+              list="model-suggestions"
+              placeholder="모델"
+              value={filters.model}
+              onChange={(e) => setFilters({ ...filters, model: e.target.value })}
+            />
+            <input
+              list="finance-suggestions"
+              placeholder="금융사"
+              value={filters.finance}
+              onChange={(e) => setFilters({ ...filters, finance: e.target.value })}
+            />
             <input
               placeholder="기준월 (YYYY-MM)"
               value={filters.snapshotMonth}
@@ -238,7 +402,42 @@ function App() {
               <option value={50}>50개</option>
               <option value={100}>100개</option>
             </select>
+            <select
+              value={filters.sortBy}
+              onChange={(e) => setFilters({ ...filters, sortBy: e.target.value as ResidualSortBy })}
+            >
+              <option value="residual_value_percent">정렬: 잔존가치%</option>
+              <option value="maker_name">정렬: 제조사</option>
+              <option value="model_name">정렬: 모델</option>
+              <option value="detail_model_name">정렬: 세부모델</option>
+              <option value="term_months">정렬: 기간</option>
+              <option value="annual_mileage_km">정렬: 약정거리</option>
+              <option value="finance_name">정렬: 금융사</option>
+              <option value="snapshot_month">정렬: 기준월</option>
+            </select>
+            <select
+              value={filters.sortOrder}
+              onChange={(e) => setFilters({ ...filters, sortOrder: e.target.value as ResidualSortOrder })}
+            >
+              <option value="desc">내림차순</option>
+              <option value="asc">오름차순</option>
+            </select>
             <button type="submit">조회</button>
+            <datalist id="maker-suggestions">
+              {suggestions.maker.map((item) => (
+                <option key={item} value={item} />
+              ))}
+            </datalist>
+            <datalist id="model-suggestions">
+              {suggestions.model.map((item) => (
+                <option key={item} value={item} />
+              ))}
+            </datalist>
+            <datalist id="finance-suggestions">
+              {suggestions.finance.map((item) => (
+                <option key={item} value={item} />
+              ))}
+            </datalist>
           </form>
         </section>
 
@@ -257,11 +456,29 @@ function App() {
           averageRent,
           biggestDrop,
           changeRows,
+          changeTotal,
+          changeFilters,
+          setChangeFilters,
+          changePage,
+          changeTotalPages,
+          setChangePage,
           uploadRows,
+          uploadLeaseFile,
+          uploading,
+          uploadMessage,
+          uploadError,
         })}
       </main>
     </div>
   )
+}
+
+function safeJsonParse(input: string): unknown | null {
+  try {
+    return JSON.parse(input)
+  } catch {
+    return null
+  }
 }
 
 function renderPage(
@@ -279,7 +496,17 @@ function renderPage(
     averageRent: number
     biggestDrop: number
     changeRows: ChangeRow[]
+    changeTotal: number
+    changeFilters: ChangeFilterState
+    setChangeFilters: (next: ChangeFilterState) => void
+    changePage: number
+    changeTotalPages: number
+    setChangePage: (next: number | ((prev: number) => number)) => void
     uploadRows: UploadHistoryRow[]
+    uploadLeaseFile: (file: File, snapshotMonth: string) => Promise<void>
+    uploading: boolean
+    uploadMessage: string | null
+    uploadError: string | null
   },
 ): JSX.Element {
   if (menu === 'home') {
@@ -332,8 +559,17 @@ function renderPage(
     return (
       <section className="panel">
         <h2>변동 리포트</h2>
-        <p className="section-sub">월간 비교 기준 변동폭(%p)을 보여줍니다.</p>
-        <ChangesTable rows={state.changeRows} />
+        <p className="section-sub">
+          월간 비교 기준 변동폭(%p)을 보여줍니다. 총 {state.changeTotal.toLocaleString()}건
+        </p>
+        <ChangesTable
+          rows={state.changeRows}
+          filters={state.changeFilters}
+          setFilters={state.setChangeFilters}
+          setPage={state.setChangePage}
+          page={state.changePage}
+          totalPages={state.changeTotalPages}
+        />
       </section>
     )
   }
@@ -342,8 +578,62 @@ function renderPage(
     <section className="panel">
       <h2>업로드 이력</h2>
       <p className="section-sub">최근 업로드 상태를 확인할 수 있습니다.</p>
+      <UploadBox
+        uploading={state.uploading}
+        uploadMessage={state.uploadMessage}
+        uploadError={state.uploadError}
+        onUpload={state.uploadLeaseFile}
+      />
       <UploadHistoryTable rows={state.uploadRows} />
     </section>
+  )
+}
+
+function UploadBox({
+  uploading,
+  uploadMessage,
+  uploadError,
+  onUpload,
+}: {
+  uploading: boolean
+  uploadMessage: string | null
+  uploadError: string | null
+  onUpload: (file: File, snapshotMonth: string) => Promise<void>
+}) {
+  const [file, setFile] = useState<File | null>(null)
+  const [snapshotMonth, setSnapshotMonth] = useState(() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  })
+
+  const onSubmit = async (e: FormEvent) => {
+    e.preventDefault()
+    if (!file) return
+    await onUpload(file, snapshotMonth)
+  }
+
+  return (
+    <form className="upload-box" onSubmit={onSubmit}>
+      <input
+        type="file"
+        accept=".xlsx"
+        onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+      />
+      <input
+        type="text"
+        placeholder="기준월 (YYYY-MM)"
+        value={snapshotMonth}
+        onChange={(e) => setSnapshotMonth(e.target.value)}
+      />
+      <button type="submit" disabled={uploading || !file}>
+        {uploading ? '업로드 중...' : '엑셀 업로드'}
+      </button>
+      {uploadMessage && <p className="upload-msg ok">{uploadMessage}</p>}
+      {uploadError && <p className="upload-msg err">{uploadError}</p>}
+      <p className="upload-hint">
+        예: <code>cartner_residual_values_lease_test.xlsx</code> (Lease 단일 시트도 가능)
+      </p>
+    </form>
   )
 }
 
@@ -424,48 +714,97 @@ function BestTable({ rows }: { rows: ResidualValueRow[] }) {
   )
 }
 
-function ChangesTable({ rows }: { rows: ChangeRow[] }) {
-  const [direction, setDirection] = useState<'all' | 'up' | 'down'>('all')
-  const [sortBy, setSortBy] = useState<'abs' | 'delta_desc' | 'delta_asc'>('abs')
-
-  const filteredRows = useMemo(() => {
-    let next = [...rows]
-    if (direction === 'up') next = next.filter((r) => r.delta_pp > 0)
-    if (direction === 'down') next = next.filter((r) => r.delta_pp < 0)
-
-    if (sortBy === 'abs') {
-      next.sort((a, b) => Math.abs(b.delta_pp) - Math.abs(a.delta_pp))
-    } else if (sortBy === 'delta_desc') {
-      next.sort((a, b) => b.delta_pp - a.delta_pp)
-    } else {
-      next.sort((a, b) => a.delta_pp - b.delta_pp)
-    }
-    return next
-  }, [rows, direction, sortBy])
+function ChangesTable({
+  rows,
+  filters,
+  setFilters,
+  setPage,
+  page,
+  totalPages,
+}: {
+  rows: ChangeRow[]
+  filters?: ChangeFilterState
+  setFilters?: (next: ChangeFilterState) => void
+  setPage?: (next: number | ((prev: number) => number)) => void
+  page?: number
+  totalPages?: number
+}) {
+  const isFullMode = Boolean(filters && setFilters && setPage && page && totalPages)
 
   return (
     <>
-      <div className="sub-toolbar">
-        <div className="segmented">
-          <button type="button" className={direction === 'all' ? 'seg active' : 'seg'} onClick={() => setDirection('all')}>
-            전체
-          </button>
-          <button type="button" className={direction === 'up' ? 'seg active' : 'seg'} onClick={() => setDirection('up')}>
-            상승
-          </button>
-          <button type="button" className={direction === 'down' ? 'seg active' : 'seg'} onClick={() => setDirection('down')}>
-            하락
-          </button>
+      {isFullMode && filters && setFilters && setPage && page && totalPages && (
+        <div className="sub-toolbar">
+          <div className="segmented">
+            <button
+              type="button"
+              className={filters.direction === 'all' ? 'seg active' : 'seg'}
+              onClick={() => {
+                setPage(1)
+                setFilters({ ...filters, direction: 'all' })
+              }}
+            >
+              전체
+            </button>
+            <button
+              type="button"
+              className={filters.direction === 'up' ? 'seg active' : 'seg'}
+              onClick={() => {
+                setPage(1)
+                setFilters({ ...filters, direction: 'up' })
+              }}
+            >
+              상승
+            </button>
+            <button
+              type="button"
+              className={filters.direction === 'down' ? 'seg active' : 'seg'}
+              onClick={() => {
+                setPage(1)
+                setFilters({ ...filters, direction: 'down' })
+              }}
+            >
+              하락
+            </button>
+          </div>
+          <div className="sub-toolbar-right">
+            <input
+              type="number"
+              min={0}
+              step="0.1"
+              placeholder="최소 변동폭(%p)"
+              value={filters.minAbsDeltaPp}
+              onChange={(e) => {
+                setPage(1)
+                setFilters({ ...filters, minAbsDeltaPp: e.target.value })
+              }}
+            />
+            <select
+              value={filters.sortBy}
+              onChange={(e) => {
+                setPage(1)
+                setFilters({ ...filters, sortBy: e.target.value as ChangeFilterState['sortBy'] })
+              }}
+            >
+              <option value="abs">변동폭 순(절대값)</option>
+              <option value="delta_desc">증가 순</option>
+              <option value="delta_asc">감소 순</option>
+            </select>
+            <select
+              value={filters.pageSize}
+              onChange={(e) => {
+                setPage(1)
+                setFilters({ ...filters, pageSize: Number(e.target.value) })
+              }}
+            >
+              <option value={20}>20개</option>
+              <option value={50}>50개</option>
+              <option value={100}>100개</option>
+            </select>
+            <span className="meta-count">{rows.length}건 표시</span>
+          </div>
         </div>
-        <div className="sub-toolbar-right">
-          <select value={sortBy} onChange={(e) => setSortBy(e.target.value as 'abs' | 'delta_desc' | 'delta_asc')}>
-            <option value="abs">변동폭 순(절대값)</option>
-            <option value="delta_desc">증가 순</option>
-            <option value="delta_asc">감소 순</option>
-          </select>
-          <span className="meta-count">{filteredRows.length}건</span>
-        </div>
-      </div>
+      )}
       <div className="table-wrap">
         <table>
         <thead>
@@ -481,7 +820,7 @@ function ChangesTable({ rows }: { rows: ChangeRow[] }) {
           </tr>
         </thead>
         <tbody>
-          {filteredRows.map((row, idx) => (
+          {rows.map((row, idx) => (
             <tr key={`${row.detail_model_name}-${idx}`}>
               <td>{row.source_type === 'lease' ? '리스' : '렌트'}</td>
               <td>{row.maker_name}</td>
@@ -495,7 +834,7 @@ function ChangesTable({ rows }: { rows: ChangeRow[] }) {
               <td>{row.snapshot_month}</td>
             </tr>
           ))}
-          {filteredRows.length === 0 && (
+          {rows.length === 0 && (
             <tr>
               <td colSpan={8} className="empty">조건에 맞는 변동 데이터가 없습니다.</td>
             </tr>
@@ -503,6 +842,9 @@ function ChangesTable({ rows }: { rows: ChangeRow[] }) {
         </tbody>
         </table>
       </div>
+      {isFullMode && page && totalPages && setPage && (
+        <Pager page={page} totalPages={totalPages} setPage={setPage} />
+      )}
     </>
   )
 }
@@ -676,8 +1018,8 @@ function buildParams(filters: FilterState, page: number) {
   params.set('sourceType', filters.sourceType)
   params.set('page', String(page))
   params.set('pageSize', String(filters.pageSize))
-  params.set('sortBy', 'residual_value_percent')
-  params.set('sortOrder', 'desc')
+  params.set('sortBy', filters.sortBy)
+  params.set('sortOrder', filters.sortOrder)
 
   if (filters.q.trim()) params.set('q', filters.q.trim())
   if (filters.maker.trim()) params.set('maker', filters.maker.trim())
@@ -687,6 +1029,23 @@ function buildParams(filters: FilterState, page: number) {
   if (filters.termMonths.trim()) params.set('termMonths', filters.termMonths.trim())
   if (filters.annualMileageKm.trim()) params.set('annualMileageKm', filters.annualMileageKm.trim())
 
+  return params
+}
+
+function buildChangesParams(
+  sourceType: SourceType,
+  snapshotMonth: string,
+  filters: ChangeFilterState,
+  page: number,
+) {
+  const params = new URLSearchParams()
+  params.set('sourceType', sourceType)
+  params.set('page', String(page))
+  params.set('pageSize', String(filters.pageSize))
+  params.set('direction', filters.direction)
+  params.set('sortBy', filters.sortBy)
+  if (filters.minAbsDeltaPp.trim()) params.set('minAbsDeltaPp', filters.minAbsDeltaPp.trim())
+  if (snapshotMonth.trim()) params.set('snapshotMonth', snapshotMonth.trim())
   return params
 }
 

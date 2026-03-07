@@ -1,30 +1,43 @@
 # Implementation Backlog
 
 ## Sprint 1 - Project Bootstrap
-- [ ] Bun + React + Hono + Cloudflare Pages Functions 초기 프로젝트 생성
-- [ ] Supabase 프로젝트 연결 (`env`/키 관리)
-- [ ] 공통 타입 정의 (`source_type`, canonical record)
-- [ ] 기본 라우트 헬스체크 (`/api/health`)
+- [x] Bun + React + Hono + Cloudflare Pages Functions 초기 프로젝트 생성
+- [x] Supabase 프로젝트 연결 (`env`/키 관리)
+- [x] 공통 타입 정의 (`source_type`, canonical record)
+- [x] 기본 라우트 헬스체크 (`/api/health`)
 
 ## Sprint 2 - Upload Pipeline (xlsx first)
-- [ ] 파일 업로드 API (`POST /api/uploads`)
-- [ ] xlsx 파서 구현 (`Lease Raw`, `Rent Raw`)
-- [ ] 컬럼 매핑/정규화/검증 로직 구현
-- [ ] `uploads`, `residual_values` 적재 트랜잭션
-- [ ] 실패 행 리포트(JSON) 저장
+- [x] 파일 업로드 API (`POST /api/uploads`)
+- [x] xlsx 파서 구현 (`Lease Raw`, `Rent Raw`)
+- [x] 컬럼 매핑/정규화/검증 로직 구현
+- [x] `uploads`, `residual_values` 적재 트랜잭션
+- [x] 실패 행 리포트(JSON) 응답 프리뷰
 
 ## Sprint 3 - Dashboard Query
-- [ ] 조회 API (`GET /api/residual-values`)
-- [ ] 필터: source_type, 제조사, 모델, 기간, 거리, 금융사, snapshot_month
-- [ ] 검색: 세부모델 텍스트 검색
-- [ ] 정렬/페이지네이션
-- [ ] React 테이블 UI + 탭(Lease/Rent)
+- [x] 조회 API (`GET /api/residual-values`)
+- [x] 필터: source_type, 제조사, 모델, 기간, 거리, 금융사, snapshot_month
+- [x] 검색: 세부모델 텍스트 검색
+- [x] 정렬/페이지네이션
+- [x] React 테이블 UI + 탭(Lease/Rent)
 
 ## Sprint 4 - Best Value / Change Report
-- [ ] 최고 잔존가치 API (`GET /api/best-values`)
+- [x] 최고 잔존가치 API (`GET /api/best-values`)
 - [ ] 변동 계산 배치 (`POST /api/uploads/:id/compute-changes`)
-- [ ] 변동 리포트 API (`GET /api/changes`)
-- [ ] 변동 UI: 상승/하락 필터, 변동폭 정렬
+- [x] 변동 리포트 API (`GET /api/changes`)
+- [x] 변동 UI: 상승/하락 필터, 변동폭 정렬
+
+## Progress Update (2026-03-07)
+- [x] `GET /api/changes` 월 선택 로직 개선
+- `snapshotMonth` 미지정 시 최신 월 1건 조회
+- `previousSnapshotMonth` 미지정 시 최신 월보다 작은 월 중 최신 1건 조회
+- [x] 성능 인덱스 초안 SQL 추가: `docs/planning/supabase-performance.sql`
+- [x] 성능 인덱스 마이그레이션 파일 생성: `supabase/migrations/*_residual_values_performance_indexes.sql`
+- [x] `GET /api/changes` 서버 필터/정렬/페이지네이션 추가
+- params: `direction`, `sortBy`, `minAbsDeltaPp`, `page`, `pageSize`
+- [x] 프론트 변동 리포트 화면 서버 필터 연동
+- [x] Drizzle 기본 세팅 추가 (`functions/api/drizzle.config.ts`, `functions/api/drizzle/schema.ts`)
+- [x] 탐색기 정렬 UI 적용 (`sortBy`, `sortOrder`)
+- [x] 검색 자동완성 API/UI 적용 (`GET /api/suggestions`)
 
 ## Sprint 5 - Auth / RLS / Ops
 - [ ] Supabase Auth 관리자 로그인
