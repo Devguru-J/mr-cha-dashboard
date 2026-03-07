@@ -13,7 +13,9 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "hono": "^4.12.5"
+    "@supabase/supabase-js": "^2.98.0",
+    "hono": "^4.12.5",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260307.1",

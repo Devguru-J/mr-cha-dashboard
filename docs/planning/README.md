@@ -60,3 +60,4 @@
 - 초기 입력은 xlsx를 지원한다.
 - 운영 표준 업로드 포맷은 CSV(UTF-8)로 전환한다.
 - 변동 계산은 `직전 업로드 버전` 대비를 기본으로 한다.
+- Supabase 미준비 기간에는 API가 mock dataset으로 fallback 동작한다.
