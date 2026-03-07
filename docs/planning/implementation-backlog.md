@@ -28,7 +28,13 @@
 
 ## Sprint 5 - Auth / RLS / Ops
 - [ ] Supabase Auth 관리자 로그인
-- [ ] RLS 정책 적용 (관리자만 read/upload)
+- [ ] Role ENUM 생성: `super`, `manager`, `dealer`
+- [ ] `user_roles` 테이블 및 사용자-역할 매핑
+- [ ] RLS 정책 적용
+- [ ] `super(admin)`: 전체 read/write + 권한관리
+- [ ] `manager(실무자)`: 전체 read + 업로드
+- [ ] `dealer(딜러사)`: 기본 read + `dealer_discounts` 페이지 한정 write + scope 제한
+- [ ] `dealer_discounts` 테이블/폼/API/RLS 구현
 - [ ] 업로드 이력 화면
 - [ ] 에러 로깅/모니터링 기초 연결
 

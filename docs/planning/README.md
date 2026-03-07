@@ -61,3 +61,5 @@
 - 운영 표준 업로드 포맷은 CSV(UTF-8)로 전환한다.
 - 변동 계산은 `직전 업로드 버전` 대비를 기본으로 한다.
 - Supabase 미준비 기간에는 API가 mock dataset으로 fallback 동작한다.
+- RLS Role은 ENUM 3단계로 고정한다: `super`(admin), `manager`(실무자), `dealer`(딜러사).
+- `dealer`는 기본 read 권한 + 딜러 할인 데이터 페이지에 한해 write 권한을 가진다.

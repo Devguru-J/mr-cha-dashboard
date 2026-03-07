@@ -58,6 +58,8 @@ type UploadHistoryRow = {
   id: string
   source_file_name: string
   snapshot_month: string
+  total_rows?: number
+  invalid_rows?: number
   status: 'completed' | 'failed' | 'processing'
   created_at: string
 }
@@ -423,9 +425,49 @@ function BestTable({ rows }: { rows: ResidualValueRow[] }) {
 }
 
 function ChangesTable({ rows }: { rows: ChangeRow[] }) {
+  const [direction, setDirection] = useState<'all' | 'up' | 'down'>('all')
+  const [sortBy, setSortBy] = useState<'abs' | 'delta_desc' | 'delta_asc'>('abs')
+
+  const filteredRows = useMemo(() => {
+    let next = [...rows]
+    if (direction === 'up') next = next.filter((r) => r.delta_pp > 0)
+    if (direction === 'down') next = next.filter((r) => r.delta_pp < 0)
+
+    if (sortBy === 'abs') {
+      next.sort((a, b) => Math.abs(b.delta_pp) - Math.abs(a.delta_pp))
+    } else if (sortBy === 'delta_desc') {
+      next.sort((a, b) => b.delta_pp - a.delta_pp)
+    } else {
+      next.sort((a, b) => a.delta_pp - b.delta_pp)
+    }
+    return next
+  }, [rows, direction, sortBy])
+
   return (
-    <div className="table-wrap">
-      <table>
+    <>
+      <div className="sub-toolbar">
+        <div className="segmented">
+          <button type="button" className={direction === 'all' ? 'seg active' : 'seg'} onClick={() => setDirection('all')}>
+            전체
+          </button>
+          <button type="button" className={direction === 'up' ? 'seg active' : 'seg'} onClick={() => setDirection('up')}>
+            상승
+          </button>
+          <button type="button" className={direction === 'down' ? 'seg active' : 'seg'} onClick={() => setDirection('down')}>
+            하락
+          </button>
+        </div>
+        <div className="sub-toolbar-right">
+          <select value={sortBy} onChange={(e) => setSortBy(e.target.value as 'abs' | 'delta_desc' | 'delta_asc')}>
+            <option value="abs">변동폭 순(절대값)</option>
+            <option value="delta_desc">증가 순</option>
+            <option value="delta_asc">감소 순</option>
+          </select>
+          <span className="meta-count">{filteredRows.length}건</span>
+        </div>
+      </div>
+      <div className="table-wrap">
+        <table>
         <thead>
           <tr>
             <th>구분</th>
@@ -439,7 +481,7 @@ function ChangesTable({ rows }: { rows: ChangeRow[] }) {
           </tr>
         </thead>
         <tbody>
-          {rows.map((row, idx) => (
+          {filteredRows.map((row, idx) => (
             <tr key={`${row.detail_model_name}-${idx}`}>
               <td>{row.source_type === 'lease' ? '리스' : '렌트'}</td>
               <td>{row.maker_name}</td>
@@ -453,13 +495,120 @@ function ChangesTable({ rows }: { rows: ChangeRow[] }) {
               <td>{row.snapshot_month}</td>
             </tr>
           ))}
+          {filteredRows.length === 0 && (
+            <tr>
+              <td colSpan={8} className="empty">조건에 맞는 변동 데이터가 없습니다.</td>
+            </tr>
+          )}
         </tbody>
-      </table>
-    </div>
+        </table>
+      </div>
+    </>
   )
 }
 
 function UploadHistoryTable({ rows }: { rows: UploadHistoryRow[] }) {
+  const [statusFilter, setStatusFilter] = useState<'all' | 'completed' | 'failed' | 'processing'>('all')
+  const [selectedUploadId, setSelectedUploadId] = useState<string | null>(rows[0]?.id ?? null)
+
+  const filteredRows = useMemo(() => {
+    if (statusFilter === 'all') return rows
+    return rows.filter((r) => r.status === statusFilter)
+  }, [rows, statusFilter])
+
+  const selectedUpload =
+    filteredRows.find((row) => row.id === selectedUploadId) ??
+    filteredRows[0] ??
+    null
+
+  return (
+    <>
+      <div className="sub-toolbar">
+        <div className="segmented">
+          <button type="button" className={statusFilter === 'all' ? 'seg active' : 'seg'} onClick={() => setStatusFilter('all')}>
+            전체
+          </button>
+          <button type="button" className={statusFilter === 'completed' ? 'seg active' : 'seg'} onClick={() => setStatusFilter('completed')}>
+            완료
+          </button>
+          <button type="button" className={statusFilter === 'failed' ? 'seg active' : 'seg'} onClick={() => setStatusFilter('failed')}>
+            실패
+          </button>
+          <button type="button" className={statusFilter === 'processing' ? 'seg active' : 'seg'} onClick={() => setStatusFilter('processing')}>
+            처리중
+          </button>
+        </div>
+        <span className="meta-count">{filteredRows.length}건</span>
+      </div>
+      <UploadTable rows={filteredRows} onSelect={setSelectedUploadId} />
+      <div className="upload-detail">
+        <h3>업로드 상세</h3>
+        {selectedUpload ? (
+          <dl>
+            <div><dt>파일명</dt><dd>{selectedUpload.source_file_name}</dd></div>
+            <div><dt>기준월</dt><dd>{selectedUpload.snapshot_month}</dd></div>
+            <div><dt>상태</dt><dd>{toKoreanStatus(selectedUpload.status)}</dd></div>
+            <div><dt>총 행수</dt><dd>{typeof selectedUpload.total_rows === 'number' ? selectedUpload.total_rows.toLocaleString() : '-'}</dd></div>
+            <div><dt>오류 행수</dt><dd>{typeof selectedUpload.invalid_rows === 'number' ? selectedUpload.invalid_rows.toLocaleString() : '-'}</dd></div>
+            <div><dt>업로드 시각</dt><dd>{formatDateTime(selectedUpload.created_at)}</dd></div>
+          </dl>
+        ) : (
+          <p className="section-sub">표에서 항목을 선택하면 상세가 표시됩니다.</p>
+        )}
+      </div>
+    </>
+  )
+}
+
+function statusToClass(status: UploadHistoryRow['status']) {
+  if (status === 'completed') return 'completed'
+  if (status === 'failed') return 'failed'
+  return 'processing'
+}
+
+function StatusBadge({ status }: { status: UploadHistoryRow['status'] }) {
+  return (
+    <span className={`status-badge ${statusToClass(status)}`}>
+      {toKoreanStatus(status)}
+    </span>
+  )
+}
+
+function UploadRow({
+  row,
+  onSelect,
+}: {
+  row: UploadHistoryRow
+  onSelect: (id: string) => void
+}) {
+  return (
+    <tr>
+      <td>{row.source_file_name}</td>
+      <td>{row.snapshot_month}</td>
+      <td>{typeof row.total_rows === 'number' ? row.total_rows.toLocaleString() : '-'}</td>
+      <td>{typeof row.invalid_rows === 'number' ? row.invalid_rows.toLocaleString() : '-'}</td>
+      <td><StatusBadge status={row.status} /></td>
+      <td>{formatDateTime(row.created_at)}</td>
+      <td>
+        <button type="button" className="ghost-btn" onClick={() => onSelect(row.id)}>
+          보기
+        </button>
+      </td>
+    </tr>
+  )
+}
+
+function UploadRows({ rows, onSelect }: { rows: UploadHistoryRow[]; onSelect: (id: string) => void }) {
+  return (
+    <>
+      {rows.map((row, idx) => (
+        <UploadRow key={`${row.id}-${idx}`} row={row} onSelect={onSelect} />
+      ))}
+    </>
+  )
+}
+
+function UploadTable({ rows, onSelect }: { rows: UploadHistoryRow[]; onSelect: (id: string) => void }) {
   return (
     <div className="table-wrap">
       <table>
@@ -471,19 +620,17 @@ function UploadHistoryTable({ rows }: { rows: UploadHistoryRow[] }) {
             <th>오류 행수</th>
             <th>상태</th>
             <th>업로드 시각</th>
+            <th>상세</th>
           </tr>
         </thead>
         <tbody>
-          {rows.map((row, idx) => (
-            <tr key={`${row.id}-${idx}`}>
-              <td>{row.source_file_name}</td>
-              <td>{row.snapshot_month}</td>
-              <td>-</td>
-              <td>-</td>
-              <td>{toKoreanStatus(row.status)}</td>
-              <td>{formatDateTime(row.created_at)}</td>
+          {rows.length > 0 ? (
+            <UploadRows rows={rows} onSelect={onSelect} />
+          ) : (
+            <tr>
+              <td colSpan={7} className="empty">조건에 맞는 업로드 이력이 없습니다.</td>
             </tr>
-          ))}
+          )}
         </tbody>
       </table>
     </div>

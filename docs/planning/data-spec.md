@@ -94,7 +94,25 @@
 - `v_best_residual_by_detail_model`: 세부모델 기준 최고 잔존가치
 - `v_residual_value_change_latest`: 최신 변동 리포트
 
-## 8) Future CSV Standard
+## 8) Auth / Role / RLS (Draft)
+역할은 ENUM으로 고정:
+
+- `super` = admin
+- `manager` = 실무자
+- `dealer` = 딜러사
+
+권한 초안:
+
+- `super`: 전체 데이터 read/write, 업로드/정정/권한관리 가능
+- `manager`: 전체 데이터 read, 업로드 가능, 권한관리 불가
+- `dealer`: 기본 조회(read) + `딜러 할인 데이터 페이지` 한정 write 가능
+
+권장 테이블:
+
+- `user_roles (user_id uuid pk, role app_role not null, dealer_scope text[] null)`
+- `dealer_discounts` (딜러 입력 할인 데이터 저장용, dealer scope 기반 RLS 적용)
+
+## 9) Future CSV Standard
 운영 전환 후에는 아래 CSV 헤더를 표준으로 사용:
 
 `source_type,maker_name,model_name,lineup_name,detail_model_name,term_months,annual_mileage_km,finance_name,residual_value_percent,residual_value_amount,snapshot_month`

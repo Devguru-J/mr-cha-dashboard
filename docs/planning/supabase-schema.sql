@@ -1,5 +1,35 @@
 create extension if not exists "pgcrypto";
 
+do $$
+begin
+  if not exists (select 1 from pg_type where typname = 'app_role') then
+    create type app_role as enum ('super', 'manager', 'dealer');
+  end if;
+end $$;
+
+create table if not exists user_roles (
+  user_id uuid primary key,
+  role app_role not null,
+  dealer_scope text[] null,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists dealer_discounts (
+  id bigserial primary key,
+  dealer_user_id uuid not null,
+  dealer_code text not null,
+  maker_name text not null,
+  model_name text not null,
+  detail_model_name text not null,
+  discount_amount numeric(14,0) null,
+  discount_percent numeric(5,2) null,
+  start_date date null,
+  end_date date null,
+  note text null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists uploads (
   id uuid primary key default gen_random_uuid(),
   source_file_name text not null,
