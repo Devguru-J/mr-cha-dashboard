@@ -50,14 +50,17 @@
 - 데이터 검증 리포트/실패 행 다운로드
 - 관리자 권한/RLS/감사 로그 강화
 
-## 5) Current Build Status (2026-03-07)
+## 5) Current Build Status (2026-03-08)
 - 업로드: `.xlsx` 업로드/파싱/중복처리/DB 적재 동작
 - 조회: `GET /api/residual-values` 필터/정렬/페이지네이션 동작
 - 최고값: `GET /api/best-values` 동작
 - 변동: `GET /api/changes` 월 자동 선택 + 서버 필터/정렬/페이지네이션 동작
 - 자동완성: `GET /api/suggestions`(제조사/모델/금융사) 추가
 - 성능: 인덱스 마이그레이션 적용 완료
-- Drizzle: 기본 설정/스키마 파일 추가 완료(점진적 전환 시작)
+- 딜러 할인: `maker+model+detail_model` 기준 목록/입력 API 및 표 기반 입력 UI 반영
+- 인증: 로그인/회원가입 UI + `GET /api/me`, `POST /api/register-profile` 반영
+- 계정: 임시 `super` 계정(`admin`) 생성 완료
+- Drizzle: 스키마/설정 정비 및 `drizzle/migrations` 생성 흐름 확인 완료
 
 ## 6) Success Criteria
 - Raw 업로드 후 1분 내 조회 가능
@@ -74,8 +77,8 @@
 - `dealer`는 기본 read 권한 + 딜러 할인 데이터 페이지에 한해 write 권한을 가진다.
 
 ## 8) Next Action Order
-1. Auth + RLS 정책 실제 적용 (`super/manager/dealer`)
-2. `dealer_discounts` API/UI 구현 (dealer write 한정)
+1. Auth + RLS 정책 실제 적용 (`super/manager/dealer`) 및 route guard 강화
+2. `dealer_discounts` RLS/권한 강제(브랜드 스코프) + 수정/삭제 정책 확정
 3. Drizzle 기반 DB 접근 점진 전환 (핵심 조회 API 우선)
 4. CSV 업로드 경로 추가 + 운영 가이드 전환
 

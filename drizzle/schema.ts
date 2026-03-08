@@ -11,25 +11,36 @@ import {
 } from 'drizzle-orm/pg-core'
 
 export const appRoleEnum = pgEnum('app_role', ['super', 'manager', 'dealer'])
+export const dealerBrandEnum = pgEnum('dealer_brand', [
+  'BMW',
+  'BENZ',
+  'AUDI',
+  'HYUNDAI',
+  'KIA',
+  'GENESIS',
+  'ETC',
+])
 
 export const userRoles = pgTable('user_roles', {
   userId: uuid('user_id').primaryKey(),
+  loginId: text('login_id'),
   role: appRoleEnum('role').notNull(),
+  dealerBrand: dealerBrandEnum('dealer_brand'),
+  dealerCode: text('dealer_code'),
   dealerScope: text('dealer_scope').array(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
 export const dealerDiscounts = pgTable('dealer_discounts', {
   id: bigserial('id', { mode: 'number' }).primaryKey(),
-  dealerUserId: uuid('dealer_user_id').notNull(),
+  dealerUserId: uuid('dealer_user_id'),
   dealerCode: text('dealer_code').notNull(),
+  sourceType: text('source_type').notNull(),
+  snapshotMonth: date('snapshot_month').notNull(),
   makerName: text('maker_name').notNull(),
   modelName: text('model_name').notNull(),
   detailModelName: text('detail_model_name').notNull(),
-  discountAmount: numeric('discount_amount', { precision: 14, scale: 0 }),
-  discountPercent: numeric('discount_percent', { precision: 5, scale: 2 }),
-  startDate: date('start_date'),
-  endDate: date('end_date'),
+  discountAmount: numeric('discount_amount', { precision: 14, scale: 0 }).notNull(),
   note: text('note'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

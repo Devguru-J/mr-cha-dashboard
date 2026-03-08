@@ -55,8 +55,8 @@ bun run dev:web
 - `bun run build:web` : 프론트 빌드
 - `bun run check:api` : API 타입체크
 - `bun run deploy` : 웹 빌드 후 Cloudflare Pages 배포
-- `bun run --cwd functions/api db:generate` : Drizzle 마이그레이션 생성
-- `bun run --cwd functions/api db:push` : Drizzle로 DB 반영 (DATABASE_URL 필요)
+- `bun run db:generate` : Drizzle 마이그레이션 생성
+- `bun run db:push` : Drizzle로 DB 반영 (DATABASE_URL 필요)
 
 ## 환경 변수
 
@@ -64,11 +64,19 @@ bun run dev:web
 
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_ANON_KEY`
+- `DATABASE_URL` (Drizzle migration용)
 
-API 개발용 `functions/api/.dev.vars`:
+API 개발용 루트 `.dev.vars`:
 
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
+- `ADMIN_SIGNUP_TOKEN`
+
+## Drizzle Migration Workflow
+1. `drizzle/schema.ts` 수정
+2. `bun run db:generate`
+3. 생성 SQL 검토
+4. `bun run db:push`
 
 Supabase를 아직 연결하지 않으면 API가 자동으로 mock 데이터 모드로 동작합니다.
 

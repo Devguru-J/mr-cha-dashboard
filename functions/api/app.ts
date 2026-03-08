@@ -2,12 +2,13 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { createClient } from '@supabase/supabase-js'
 import * as XLSX from 'xlsx'
-import { MOCK_RESIDUAL_VALUES, MOCK_UPLOADS } from './mock-data'
+import { MOCK_DEALER_DISCOUNTS, MOCK_RESIDUAL_VALUES, MOCK_UPLOADS } from './mock-data'
 
 type Bindings = {
   SUPABASE_URL?: string
   SUPABASE_ANON_KEY?: string
   SUPABASE_SERVICE_ROLE_KEY?: string
+  ADMIN_SIGNUP_TOKEN?: string
 }
 
 type SourceType = 'lease' | 'rent'
@@ -43,6 +44,40 @@ type ParseColumnIndexes = {
   residualValuePercent: number
 }
 type SupabaseAdminClient = NonNullable<ReturnType<typeof createSupabaseAdminClient>>
+type SuggestionField = 'maker_name' | 'model_name' | 'finance_name'
+type DealerVehicleRow = {
+  maker_name: string
+  model_name: string
+  detail_model_name: string
+}
+type DealerDiscountRecord = {
+  id: number
+  dealer_code: string
+  source_type: SourceType
+  snapshot_month: string
+  maker_name: string
+  model_name: string
+  detail_model_name: string
+  discount_amount: number
+  note: string
+  created_at: string
+  updated_at: string
+}
+type AppRole = 'super' | 'manager' | 'dealer'
+
+let mockDealerDiscounts: DealerDiscountRecord[] = MOCK_DEALER_DISCOUNTS.map((row) => ({
+  id: Number(row.id),
+  dealer_code: String(row.dealer_code),
+  source_type: row.source_type,
+  snapshot_month: String(row.snapshot_month),
+  maker_name: String(row.maker_name),
+  model_name: String(row.model_name),
+  detail_model_name: String(row.detail_model_name),
+  discount_amount: Number(row.discount_amount),
+  note: String(row.note ?? ''),
+  created_at: String(row.created_at),
+  updated_at: String(row.updated_at),
+}))
 
 const SHEET_SOURCES: Array<{
   sourceType: SourceType
@@ -86,6 +121,96 @@ app.get('/api/health', (c) => {
     service: 'mr-cha-dashboard-api',
     timestamp: new Date().toISOString(),
   })
+})
+
+app.get('/api/me', async (c) => {
+  const supabase = createSupabaseAdminClient(c.env)
+  if (!supabase) {
+    return c.json({ ok: false, message: 'Supabase is not configured' }, 500)
+  }
+
+  const authUser = await getAuthUserFromRequest(c)
+  if (!authUser.ok) {
+    return c.json({ ok: false, message: authUser.message }, 401)
+  }
+
+  const roleRes = await supabase
+    .from('user_roles')
+    .select('role,login_id,dealer_brand,dealer_code')
+    .eq('user_id', authUser.user.id)
+    .maybeSingle()
+
+  if (roleRes.error) {
+    return c.json({ ok: false, message: roleRes.error.message }, 500)
+  }
+
+  return c.json({
+    ok: true,
+    user: {
+      user_id: authUser.user.id,
+      email: authUser.user.email ?? '',
+      role: (roleRes.data?.role ?? null) as AppRole | null,
+      login_id: roleRes.data?.login_id ?? null,
+      dealer_brand: roleRes.data?.dealer_brand ?? null,
+      dealer_code: roleRes.data?.dealer_code ?? null,
+    },
+  })
+})
+
+app.post('/api/register-profile', async (c) => {
+  const supabase = createSupabaseAdminClient(c.env)
+  if (!supabase) {
+    return c.json({ ok: false, message: 'Supabase is not configured' }, 500)
+  }
+
+  const body = await c.req.json().catch(() => null)
+  const userId = normalizeText(body?.userId)
+  const loginId = normalizeLoginId(body?.loginId)
+  const role = parseAppRole(body?.role)
+  const dealerBrand = normalizeText(body?.dealerBrand)
+  const dealerCode = normalizeText(body?.dealerCode)
+  const adminSignupToken = normalizeText(body?.adminSignupToken)
+
+  if (!userId || !role) {
+    return c.json({ ok: false, message: 'userId and role are required' }, 400)
+  }
+
+  if (role !== 'dealer') {
+    const superCountRes = await supabase
+      .from('user_roles')
+      .select('user_id', { count: 'exact', head: true })
+      .eq('role', 'super')
+    if (superCountRes.error) {
+      return c.json({ ok: false, message: superCountRes.error.message }, 500)
+    }
+
+    const isBootstrap = (superCountRes.count ?? 0) === 0 && role === 'super'
+    if (!isBootstrap) {
+      const expected = resolveEnv(c.env, 'ADMIN_SIGNUP_TOKEN') ?? ''
+      if (!expected || adminSignupToken !== expected) {
+        return c.json({ ok: false, message: 'invalid admin signup token' }, 403)
+      }
+    }
+  }
+
+  if (role === 'dealer' && (!dealerBrand || !dealerCode)) {
+    return c.json({ ok: false, message: 'dealerBrand and dealerCode are required for dealer role' }, 400)
+  }
+
+  const payload = {
+    user_id: userId,
+    login_id: loginId || null,
+    role,
+    dealer_brand: role === 'dealer' ? dealerBrand : null,
+    dealer_code: role === 'dealer' ? dealerCode : null,
+  }
+
+  const upsert = await supabase.from('user_roles').upsert(payload, { onConflict: 'user_id' })
+  if (upsert.error) {
+    return c.json({ ok: false, message: upsert.error.message }, 500)
+  }
+
+  return c.json({ ok: true })
 })
 
 app.get('/api/config-check', async (c) => {
@@ -550,6 +675,206 @@ app.get('/api/suggestions', async (c) => {
   return c.json({ ok: true, field, items })
 })
 
+app.get('/api/dealer-vehicles', async (c) => {
+  const supabase = createSupabaseAdminClient(c.env)
+  const sourceType = parseSourceType(c.req.query('sourceType')) ?? 'lease'
+  const dealerBrand = cleanTextQuery(c.req.query('dealerBrand'))
+  const snapshotMonth = normalizeSnapshotMonthQuery(c.req.query('snapshotMonth'))
+  const keyword = cleanKeywordQuery(c.req.query('q')).toLowerCase()
+  const limit = clampNumber(c.req.query('limit'), 500, 1, 3000)
+
+  if (!dealerBrand) {
+    return c.json({ ok: false, message: 'dealerBrand is required' }, 400)
+  }
+
+  if (!supabase) {
+    const rows = buildDealerVehicleRows(
+      MOCK_RESIDUAL_VALUES.filter((row) => {
+        if (row.source_type !== sourceType) return false
+        if (row.maker_name !== dealerBrand) return false
+        if (snapshotMonth && row.snapshot_month !== snapshotMonth) return false
+        if (!keyword) return true
+        const haystack = `${row.model_name} ${row.detail_model_name}`.toLowerCase()
+        return haystack.includes(keyword)
+      }),
+      limit,
+    )
+    return c.json({ ok: true, items: rows, sourceType, dealerBrand, snapshotMonth, mockMode: true })
+  }
+
+  let query = supabase
+    .from('residual_values')
+    .select('maker_name,model_name,detail_model_name,snapshot_month')
+    .eq('source_type', sourceType)
+    .eq('maker_name', dealerBrand)
+
+  if (snapshotMonth) {
+    query = query.eq('snapshot_month', snapshotMonth)
+  }
+
+  const res = await query.order('model_name', { ascending: true }).limit(20000)
+  if (res.error) {
+    return c.json({ ok: false, message: res.error.message }, 500)
+  }
+
+  const filtered = (res.data ?? []).filter((row: any) => {
+    if (!keyword) return true
+    const haystack = `${row.model_name} ${row.detail_model_name}`.toLowerCase()
+    return haystack.includes(keyword)
+  })
+
+  const rows = buildDealerVehicleRows(filtered, limit)
+  return c.json({ ok: true, items: rows, sourceType, dealerBrand, snapshotMonth })
+})
+
+app.get('/api/dealer-discounts', async (c) => {
+  const supabase = createSupabaseAdminClient(c.env)
+  const sourceType = parseSourceType(c.req.query('sourceType')) ?? 'lease'
+  const dealerBrand = cleanTextQuery(c.req.query('dealerBrand'))
+  const dealerCode = cleanTextQuery(c.req.query('dealerCode'))
+  const snapshotMonth = normalizeSnapshotMonthQuery(c.req.query('snapshotMonth'))
+  const limit = clampNumber(c.req.query('limit'), 200, 1, 2000)
+
+  if (!dealerBrand || !dealerCode) {
+    return c.json({ ok: false, message: 'dealerBrand and dealerCode are required' }, 400)
+  }
+
+  if (!supabase) {
+    const items = mockDealerDiscounts
+      .filter((row) => {
+        if (row.source_type !== sourceType) return false
+        if (row.dealer_code !== dealerCode) return false
+        if (row.maker_name !== dealerBrand) return false
+        if (snapshotMonth && row.snapshot_month !== snapshotMonth) return false
+        return true
+      })
+      .slice(0, limit)
+    return c.json({ ok: true, items, sourceType, dealerBrand, dealerCode, snapshotMonth, mockMode: true })
+  }
+
+  let query = supabase
+    .from('dealer_discounts')
+    .select(
+      'id,dealer_code,source_type,snapshot_month,maker_name,model_name,detail_model_name,discount_amount,note,created_at,updated_at',
+    )
+    .eq('source_type', sourceType)
+    .eq('dealer_code', dealerCode)
+    .eq('maker_name', dealerBrand)
+
+  if (snapshotMonth) {
+    query = query.eq('snapshot_month', snapshotMonth)
+  }
+
+  const res = await query.order('updated_at', { ascending: false }).limit(limit)
+  if (res.error) {
+    return c.json({ ok: false, message: res.error.message }, 500)
+  }
+
+  return c.json({ ok: true, items: res.data ?? [], sourceType, dealerBrand, dealerCode, snapshotMonth })
+})
+
+app.post('/api/dealer-discounts', async (c) => {
+  const supabase = createSupabaseAdminClient(c.env)
+  const body = await c.req.json().catch(() => null)
+  const sourceType = parseSourceType(body?.sourceType) ?? 'lease'
+  const dealerCode = normalizeText(body?.dealerCode)
+  const dealerBrand = normalizeText(body?.dealerBrand)
+  const makerName = normalizeText(body?.maker_name)
+  const modelName = normalizeText(body?.model_name)
+  const detailModelName = normalizeText(body?.detail_model_name)
+  const note = normalizeText(body?.note)
+  const snapshotMonth = normalizeSnapshotMonthFromText(body?.snapshotMonth)
+  const discountAmount = parseDiscountAmount(body?.discount_amount)
+
+  if (!dealerCode || !dealerBrand) {
+    return c.json({ ok: false, message: 'dealerCode and dealerBrand are required' }, 400)
+  }
+  if (!makerName || !modelName || !detailModelName || !snapshotMonth) {
+    return c.json({ ok: false, message: 'maker_name, model_name, detail_model_name, snapshotMonth are required' }, 400)
+  }
+  if (makerName !== dealerBrand) {
+    return c.json({ ok: false, message: 'maker_name must match dealerBrand' }, 400)
+  }
+  if (discountAmount === null) {
+    return c.json({ ok: false, message: 'discount_amount must be a valid number' }, 400)
+  }
+
+  if (!supabase) {
+    const now = new Date().toISOString()
+    const existingIdx = mockDealerDiscounts.findIndex(
+      (row) =>
+        row.dealer_code === dealerCode &&
+        row.source_type === sourceType &&
+        row.snapshot_month === snapshotMonth &&
+        row.maker_name === makerName &&
+        row.model_name === modelName &&
+        row.detail_model_name === detailModelName,
+    )
+
+    if (existingIdx >= 0) {
+      mockDealerDiscounts[existingIdx] = {
+        ...mockDealerDiscounts[existingIdx],
+        discount_amount: discountAmount,
+        note,
+        updated_at: now,
+      }
+      return c.json({ ok: true, item: mockDealerDiscounts[existingIdx], mockMode: true })
+    }
+
+    const newItem = {
+      id: mockDealerDiscounts.length + 1,
+      dealer_code: dealerCode,
+      source_type: sourceType,
+      snapshot_month: snapshotMonth,
+      maker_name: makerName,
+      model_name: modelName,
+      detail_model_name: detailModelName,
+      discount_amount: discountAmount,
+      note,
+      created_at: now,
+      updated_at: now,
+    }
+    mockDealerDiscounts = [newItem, ...mockDealerDiscounts]
+    return c.json({ ok: true, item: newItem, mockMode: true })
+  }
+
+  const upsertData = {
+    dealer_code: dealerCode,
+    source_type: sourceType,
+    snapshot_month: snapshotMonth,
+    maker_name: makerName,
+    model_name: modelName,
+    detail_model_name: detailModelName,
+    discount_amount: discountAmount,
+    note,
+    updated_at: new Date().toISOString(),
+  }
+
+  const res = await supabase
+    .from('dealer_discounts')
+    .upsert(upsertData, {
+      onConflict:
+        'dealer_code,source_type,snapshot_month,maker_name,model_name,detail_model_name',
+    })
+    .select(
+      'id,dealer_code,source_type,snapshot_month,maker_name,model_name,detail_model_name,discount_amount,note,created_at,updated_at',
+    )
+    .single()
+
+  if (res.error) {
+    return c.json(
+      {
+        ok: false,
+        message: 'Failed to upsert dealer discount. Check dealer_discounts table schema/unique key.',
+        error: res.error.message,
+      },
+      500,
+    )
+  }
+
+  return c.json({ ok: true, item: res.data })
+})
+
 app.post('/api/uploads', async (c) => {
   const formData = await c.req.formData()
   const file = formData.get('file')
@@ -659,6 +984,35 @@ app.post('/api/uploads', async (c) => {
 })
 
 app.notFound((c) => c.json({ ok: false, message: 'Not Found' }, 404))
+
+async function getAuthUserFromRequest(c: any): Promise<
+  | { ok: true; user: { id: string; email?: string | null } }
+  | { ok: false; message: string }
+> {
+  const authHeader = c.req.header('authorization') ?? c.req.header('Authorization') ?? ''
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : ''
+  if (!token) {
+    return { ok: false, message: 'Missing bearer token' }
+  }
+
+  const supabase = createSupabaseAdminClient(c.env)
+  if (!supabase) {
+    return { ok: false, message: 'Supabase is not configured' }
+  }
+
+  const userRes = await supabase.auth.getUser(token)
+  if (userRes.error || !userRes.data.user) {
+    return { ok: false, message: userRes.error?.message ?? 'Invalid token' }
+  }
+
+  return {
+    ok: true,
+    user: {
+      id: userRes.data.user.id,
+      email: userRes.data.user.email ?? null,
+    },
+  }
+}
 
 function createSupabaseAdminClient(env: Bindings) {
   const supabaseUrl = resolveEnv(env, 'SUPABASE_URL')
@@ -1157,11 +1511,65 @@ function parseMinAbsDeltaPp(value: string | undefined): number {
 
 function parseSuggestionField(
   value: string | undefined,
-): 'maker_name' | 'model_name' | 'finance_name' | null {
+): SuggestionField | null {
   if (value === 'maker_name' || value === 'model_name' || value === 'finance_name') {
     return value
   }
   return null
+}
+
+function parseAppRole(value: unknown): AppRole | null {
+  if (value === 'super' || value === 'manager' || value === 'dealer') {
+    return value
+  }
+  return null
+}
+
+function normalizeLoginId(value: unknown): string {
+  return normalizeText(value).toLowerCase()
+}
+
+function parseDiscountAmount(value: unknown): number | null {
+  const raw = String(value ?? '')
+    .replace(/,/g, '')
+    .trim()
+  if (!raw) return null
+  const num = Number(raw)
+  if (!Number.isFinite(num)) return null
+  return Math.round(num)
+}
+
+function normalizeSnapshotMonthFromText(value: unknown): string | null {
+  const raw = normalizeText(value)
+  if (!raw) return null
+  return normalizeSnapshotMonthQuery(raw)
+}
+
+function buildDealerVehicleRows(rows: ReadonlyArray<any>, limit: number): DealerVehicleRow[] {
+  const map = new Map<string, DealerVehicleRow>()
+  for (const row of rows) {
+    const makerName = normalizeText(row.maker_name)
+    const modelName = normalizeText(row.model_name)
+    const detailModelName = normalizeText(row.detail_model_name)
+    if (!makerName || !modelName || !detailModelName) continue
+    const key = [makerName, modelName, detailModelName].join('|')
+    if (!map.has(key)) {
+      map.set(key, {
+        maker_name: makerName,
+        model_name: modelName,
+        detail_model_name: detailModelName,
+      })
+    }
+    if (map.size >= limit) break
+  }
+
+  return Array.from(map.values()).sort((a, b) => {
+    const makerSort = a.maker_name.localeCompare(b.maker_name, 'ko')
+    if (makerSort !== 0) return makerSort
+    const modelSort = a.model_name.localeCompare(b.model_name, 'ko')
+    if (modelSort !== 0) return modelSort
+    return a.detail_model_name.localeCompare(b.detail_model_name, 'ko')
+  })
 }
 
 function filterSortAndPaginateChanges(

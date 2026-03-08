@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent, JSX } from 'react'
 import './App.css'
+import { hasSupabaseConfig, supabase } from './lib/supabase'
 
 type SourceType = 'lease' | 'rent'
-type MenuKey = 'home' | 'explorer' | 'best' | 'changes' | 'uploads'
+type MenuKey = 'home' | 'explorer' | 'best' | 'changes' | 'uploads' | 'dealer-discounts'
+type AppRole = 'super' | 'manager' | 'dealer'
+type AuthMode = 'login' | 'signup'
 type ResidualSortBy =
   | 'residual_value_percent'
   | 'maker_name'
@@ -84,6 +87,38 @@ type UploadHistoryRow = {
   created_at: string
 }
 
+type DealerVehicleRow = {
+  maker_name: string
+  model_name: string
+  detail_model_name: string
+}
+
+type DealerDiscountRow = {
+  id: number
+  dealer_code: string
+  source_type: SourceType
+  snapshot_month: string
+  maker_name: string
+  model_name: string
+  detail_model_name: string
+  discount_amount: number
+  note?: string
+  updated_at: string
+}
+
+type MeResponse = {
+  ok: boolean
+  user?: {
+    user_id: string
+    email: string
+    role: AppRole | null
+    login_id: string | null
+    dealer_brand: string | null
+    dealer_code: string | null
+  }
+  message?: string
+}
+
 const DEFAULT_FILTERS: FilterState = {
   sourceType: 'lease',
   q: '',
@@ -111,9 +146,23 @@ const MENU: Array<{ key: MenuKey; label: string }> = [
   { key: 'best', label: '최고 잔존가치' },
   { key: 'changes', label: '변동 리포트' },
   { key: 'uploads', label: '업로드 이력' },
+  { key: 'dealer-discounts', label: '딜러 할인 입력' },
 ]
 
 function App() {
+  const [authMode, setAuthMode] = useState<AuthMode>('login')
+  const [authLoginId, setAuthLoginId] = useState('')
+  const [authPassword, setAuthPassword] = useState('')
+  const [signupRole, setSignupRole] = useState<AppRole>('dealer')
+  const [signupDealerBrand, setSignupDealerBrand] = useState('BMW')
+  const [signupDealerCode, setSignupDealerCode] = useState('')
+  const [signupAdminToken, setSignupAdminToken] = useState('')
+  const [authLoading, setAuthLoading] = useState(false)
+  const [authMessage, setAuthMessage] = useState<string | null>(null)
+  const [authError, setAuthError] = useState<string | null>(null)
+  const [accessToken, setAccessToken] = useState<string | null>(null)
+  const [profile, setProfile] = useState<MeResponse['user'] | null>(null)
+
   const [menu, setMenu] = useState<MenuKey>('home')
 
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS)
@@ -130,6 +179,16 @@ function App() {
   const [changeFilters, setChangeFilters] = useState<ChangeFilterState>(DEFAULT_CHANGE_FILTERS)
   const [changePage, setChangePage] = useState(1)
   const [uploadRows, setUploadRows] = useState<UploadHistoryRow[]>([])
+  const [dealerBrand, setDealerBrand] = useState('BMW')
+  const [dealerCode, setDealerCode] = useState('BMW-SEOUL-01')
+  const [dealerSearchText, setDealerSearchText] = useState('')
+  const [dealerSearchApplied, setDealerSearchApplied] = useState('')
+  const [dealerVehicles, setDealerVehicles] = useState<DealerVehicleRow[]>([])
+  const [dealerDiscountRows, setDealerDiscountRows] = useState<DealerDiscountRow[]>([])
+  const [dealerDraftAmounts, setDealerDraftAmounts] = useState<Record<string, string>>({})
+  const [dealerLoading, setDealerLoading] = useState(false)
+  const [dealerSubmitMessage, setDealerSubmitMessage] = useState<string | null>(null)
+  const [dealerSubmitError, setDealerSubmitError] = useState<string | null>(null)
   const [suggestions, setSuggestions] = useState<{
     maker: string[]
     model: string[]
@@ -159,7 +218,59 @@ function App() {
     return raw > 0 ? raw : 1
   }, [changeTotal, changeFilters.pageSize])
 
+  const fetchMyProfile = async (token: string) => {
+    const res = await fetch('/api/me', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    const data = (await res.json()) as MeResponse
+    if (!res.ok || !data.ok || !data.user) {
+      throw new Error(data.message ?? '프로필 조회 실패')
+    }
+    setProfile(data.user)
+    if (data.user.role === 'dealer') {
+      setMenu('dealer-discounts')
+      if (data.user.dealer_brand) setDealerBrand(data.user.dealer_brand)
+      if (data.user.dealer_code) setDealerCode(data.user.dealer_code)
+    }
+  }
+
   useEffect(() => {
+    if (!supabase) return
+    let mounted = true
+    void supabase.auth.getSession().then(async ({ data }) => {
+      if (!mounted) return
+      const token = data.session?.access_token ?? null
+      setAccessToken(token)
+      if (token) {
+        try {
+          await fetchMyProfile(token)
+        } catch {
+          setProfile(null)
+        }
+      }
+    })
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      const token = session?.access_token ?? null
+      setAccessToken(token)
+      if (!token) {
+        setProfile(null)
+        return
+      }
+      void fetchMyProfile(token).catch(() => {
+        setProfile(null)
+      })
+    })
+
+    return () => {
+      mounted = false
+      listener.subscription.unsubscribe()
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!accessToken || !profile) return
+    if (profile.role === 'dealer') return
     const run = async () => {
       setLoading(true)
       setError(null)
@@ -206,6 +317,57 @@ function App() {
     }
     void run()
   }, [appliedFilters, page, changeFilters, changePage])
+
+  useEffect(() => {
+    if (menu !== 'dealer-discounts') return
+    if (!dealerBrand.trim() || !dealerCode.trim()) return
+
+    const run = async () => {
+      setDealerLoading(true)
+      try {
+        const vehicleParams = new URLSearchParams({
+          sourceType: appliedFilters.sourceType,
+          dealerBrand: dealerBrand.trim(),
+          limit: '2000',
+        })
+        if (dealerSearchApplied.trim()) {
+          vehicleParams.set('q', dealerSearchApplied.trim())
+        }
+        if (appliedFilters.snapshotMonth.trim()) {
+          vehicleParams.set('snapshotMonth', appliedFilters.snapshotMonth.trim())
+        }
+
+        const discountParams = new URLSearchParams({
+          sourceType: appliedFilters.sourceType,
+          dealerBrand: dealerBrand.trim(),
+          dealerCode: dealerCode.trim(),
+          limit: '500',
+        })
+        if (appliedFilters.snapshotMonth.trim()) {
+          discountParams.set('snapshotMonth', appliedFilters.snapshotMonth.trim())
+        }
+
+        const [vehiclesRes, discountsRes] = await Promise.all([
+          fetch(`/api/dealer-vehicles?${vehicleParams.toString()}`),
+          fetch(`/api/dealer-discounts?${discountParams.toString()}`),
+        ])
+
+        if (!vehiclesRes.ok) throw new Error(`딜러 차량 목록 조회 실패: ${vehiclesRes.status}`)
+        if (!discountsRes.ok) throw new Error(`딜러 할인 목록 조회 실패: ${discountsRes.status}`)
+
+        const vehiclesData = (await vehiclesRes.json()) as { items?: DealerVehicleRow[] }
+        const discountsData = (await discountsRes.json()) as { items?: DealerDiscountRow[] }
+        const vehicleItems = vehiclesData.items ?? []
+        setDealerVehicles(vehicleItems)
+        setDealerDiscountRows(discountsData.items ?? [])
+      } catch (err) {
+        setDealerSubmitError(err instanceof Error ? err.message : '딜러 데이터 조회 중 오류가 발생했습니다.')
+      } finally {
+        setDealerLoading(false)
+      }
+    }
+    void run()
+  }, [menu, appliedFilters.sourceType, appliedFilters.snapshotMonth, dealerBrand, dealerCode, dealerSearchApplied])
 
   useEffect(() => {
     let cancelled = false
@@ -264,6 +426,79 @@ function App() {
     setAppliedFilters(next)
   }
 
+  const onAuthSubmit = async (e: FormEvent) => {
+    e.preventDefault()
+    if (!supabase) {
+      setAuthError('Supabase 설정이 필요합니다. VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY 확인')
+      return
+    }
+
+    setAuthLoading(true)
+    setAuthError(null)
+    setAuthMessage(null)
+
+    try {
+      const loginId = authLoginId.trim().toLowerCase()
+      if (!loginId) {
+        throw new Error('아이디를 입력해주세요.')
+      }
+
+      if (authMode === 'login') {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: toAuthEmail(loginId),
+          password: authPassword,
+        })
+        if (error) throw error
+        const token = data.session?.access_token
+        if (!token) throw new Error('세션 토큰이 없습니다.')
+        await fetchMyProfile(token)
+        setAuthMessage('로그인 성공')
+      } else {
+        const { data, error } = await supabase.auth.signUp({
+          email: toAuthEmail(loginId),
+          password: authPassword,
+        })
+        if (error) throw error
+        if (!data.user?.id) {
+          setAuthMessage('회원가입 요청 완료. 이메일 인증 후 로그인해주세요.')
+          return
+        }
+
+        const regRes = await fetch('/api/register-profile', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: data.user.id,
+            loginId,
+            role: signupRole,
+            dealerBrand: signupRole === 'dealer' ? signupDealerBrand : null,
+            dealerCode: signupRole === 'dealer' ? signupDealerCode : null,
+            adminSignupToken: signupRole === 'dealer' ? '' : signupAdminToken,
+          }),
+        })
+        const regData = (await regRes.json()) as { ok?: boolean; message?: string }
+        if (!regRes.ok || !regData.ok) {
+          throw new Error(regData.message ?? '역할 등록 실패')
+        }
+
+        setAuthMessage('회원가입 완료. 로그인해주세요.')
+        setAuthMode('login')
+      }
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : '인증 처리 중 오류가 발생했습니다.')
+    } finally {
+      setAuthLoading(false)
+    }
+  }
+
+  const onLogout = async () => {
+    if (!supabase) return
+    await supabase.auth.signOut()
+    setProfile(null)
+    setAccessToken(null)
+    setMenu('home')
+  }
+
   const uploadLeaseFile = async (file: File, snapshotMonth: string) => {
     setUploading(true)
     setUploadMessage(null)
@@ -320,12 +555,227 @@ function App() {
     }
   }
 
+  const submitDealerDiscount = async (vehicle: DealerVehicleRow, rawAmount: string) => {
+    setDealerSubmitError(null)
+    setDealerSubmitMessage(null)
+    const amount = rawAmount.replace(/,/g, '').trim()
+    if (!amount) {
+      setDealerSubmitError('할인 금액을 입력해주세요.')
+      return
+    }
+
+    try {
+      const res = await fetch('/api/dealer-discounts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sourceType: appliedFilters.sourceType,
+          snapshotMonth: appliedFilters.snapshotMonth.trim() || formatCurrentMonth(),
+          dealerBrand: dealerBrand.trim(),
+          dealerCode: dealerCode.trim(),
+          maker_name: vehicle.maker_name,
+          model_name: vehicle.model_name,
+          detail_model_name: vehicle.detail_model_name,
+          discount_amount: amount,
+          note: '',
+        }),
+      })
+
+      const data = (await res.json()) as { ok?: boolean; message?: string }
+      if (!res.ok || !data.ok) {
+        throw new Error(data.message ?? `할인 저장 실패 (${res.status})`)
+      }
+
+      setDealerSubmitMessage('할인 정보가 저장되었습니다.')
+      setDealerDraftAmounts((prev) => ({ ...prev, [toVehicleKey(vehicle)]: amount }))
+
+      const refreshParams = new URLSearchParams({
+        sourceType: appliedFilters.sourceType,
+        dealerBrand: dealerBrand.trim(),
+        dealerCode: dealerCode.trim(),
+        limit: '500',
+      })
+      if (appliedFilters.snapshotMonth.trim()) {
+        refreshParams.set('snapshotMonth', appliedFilters.snapshotMonth.trim())
+      }
+
+      const refreshRes = await fetch(`/api/dealer-discounts?${refreshParams.toString()}`)
+      if (refreshRes.ok) {
+        const refreshData = (await refreshRes.json()) as { items?: DealerDiscountRow[] }
+        setDealerDiscountRows(refreshData.items ?? [])
+      }
+    } catch (err) {
+      setDealerSubmitError(err instanceof Error ? err.message : '할인 저장 중 오류가 발생했습니다.')
+    }
+  }
+
+  const submitDealerDiscountAll = async () => {
+    setDealerSubmitError(null)
+    setDealerSubmitMessage(null)
+
+    const targets = dealerVehicles
+      .map((vehicle) => {
+        const key = toVehicleKey(vehicle)
+        const amount = (dealerDraftAmounts[key] ?? '').replace(/,/g, '').trim()
+        return { vehicle, amount }
+      })
+      .filter((item) => item.amount.length > 0)
+
+    if (targets.length === 0) {
+      setDealerSubmitError('일괄 저장할 할인 금액이 없습니다.')
+      return
+    }
+
+    try {
+      const snapshotMonth = appliedFilters.snapshotMonth.trim() || formatCurrentMonth()
+      const results = await Promise.all(
+        targets.map(async ({ vehicle, amount }) => {
+          const res = await fetch('/api/dealer-discounts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              sourceType: appliedFilters.sourceType,
+              snapshotMonth,
+              dealerBrand: dealerBrand.trim(),
+              dealerCode: dealerCode.trim(),
+              maker_name: vehicle.maker_name,
+              model_name: vehicle.model_name,
+              detail_model_name: vehicle.detail_model_name,
+              discount_amount: amount,
+              note: '',
+            }),
+          })
+
+          const data = (await res.json()) as { ok?: boolean; message?: string }
+          if (!res.ok || !data.ok) {
+            throw new Error(data.message ?? `일괄 저장 실패 (${res.status})`)
+          }
+          return true
+        }),
+      )
+
+      setDealerSubmitMessage(`일괄 저장 완료: ${results.length}건`)
+
+      const refreshParams = new URLSearchParams({
+        sourceType: appliedFilters.sourceType,
+        dealerBrand: dealerBrand.trim(),
+        dealerCode: dealerCode.trim(),
+        limit: '500',
+      })
+      if (appliedFilters.snapshotMonth.trim()) {
+        refreshParams.set('snapshotMonth', appliedFilters.snapshotMonth.trim())
+      }
+
+      const refreshRes = await fetch(`/api/dealer-discounts?${refreshParams.toString()}`)
+      if (refreshRes.ok) {
+        const refreshData = (await refreshRes.json()) as { items?: DealerDiscountRow[] }
+        setDealerDiscountRows(refreshData.items ?? [])
+      }
+    } catch (err) {
+      setDealerSubmitError(err instanceof Error ? err.message : '일괄 저장 중 오류가 발생했습니다.')
+    }
+  }
+
+  const applyDealerSearch = () => {
+    setDealerSubmitError(null)
+    setDealerSearchApplied(dealerSearchText.trim())
+  }
+
+  if (!hasSupabaseConfig) {
+    return (
+      <main className="content">
+        <section className="panel">
+          <h2>Supabase 설정 필요</h2>
+          <p className="section-sub">
+            <code>VITE_SUPABASE_URL</code>, <code>VITE_SUPABASE_ANON_KEY</code>를 설정한 뒤 다시 실행해주세요.
+          </p>
+        </section>
+      </main>
+    )
+  }
+
+  if (!accessToken || !profile?.role) {
+    return (
+      <main className="content">
+        <section className="panel auth-panel">
+          <h2>{authMode === 'login' ? '로그인' : '회원가입'}</h2>
+          <form className="filters" onSubmit={onAuthSubmit}>
+            <input
+              type="text"
+              placeholder="아이디"
+              value={authLoginId}
+              onChange={(e) => setAuthLoginId(e.target.value)}
+              required
+            />
+            <input
+              type="password"
+              placeholder="비밀번호"
+              value={authPassword}
+              onChange={(e) => setAuthPassword(e.target.value)}
+              required
+            />
+            {authMode === 'signup' && (
+              <>
+                <select value={signupRole} onChange={(e) => setSignupRole(e.target.value as AppRole)}>
+                  <option value="dealer">dealer</option>
+                  <option value="manager">manager</option>
+                  <option value="super">super</option>
+                </select>
+                {signupRole === 'dealer' ? (
+                  <>
+                    <select value={signupDealerBrand} onChange={(e) => setSignupDealerBrand(e.target.value)}>
+                      <option value="BMW">BMW</option>
+                      <option value="BENZ">BENZ</option>
+                      <option value="AUDI">AUDI</option>
+                      <option value="HYUNDAI">HYUNDAI</option>
+                      <option value="KIA">KIA</option>
+                      <option value="GENESIS">GENESIS</option>
+                      <option value="ETC">ETC</option>
+                    </select>
+                    <input
+                      placeholder="딜러 코드 (예: BMW-SEOUL-01)"
+                      value={signupDealerCode}
+                      onChange={(e) => setSignupDealerCode(e.target.value)}
+                      required
+                    />
+                  </>
+                ) : (
+                  <input
+                    type="password"
+                    placeholder="관리자 가입 토큰"
+                    value={signupAdminToken}
+                    onChange={(e) => setSignupAdminToken(e.target.value)}
+                    required
+                  />
+                )}
+              </>
+            )}
+            <button type="submit" disabled={authLoading}>
+              {authLoading ? '처리중...' : authMode === 'login' ? '로그인' : '회원가입'}
+            </button>
+          </form>
+          <div className="sub-toolbar">
+            <button type="button" className="ghost-btn" onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')}>
+              {authMode === 'login' ? '회원가입으로' : '로그인으로'}
+            </button>
+          </div>
+          {authMessage && <p className="upload-msg ok">{authMessage}</p>}
+          {authError && <p className="upload-msg err">{authError}</p>}
+        </section>
+      </main>
+    )
+  }
+
+  const visibleMenu =
+    profile.role === 'dealer' ? MENU.filter((item) => item.key === 'dealer-discounts') : MENU
+
   return (
     <div className="app-shell">
       <aside className="sidebar">
         <div className="brand">MR CHA 운영자</div>
+        <p className="section-sub">{profile.login_id ?? profile.email} ({profile.role})</p>
         <nav className="menu">
-          {MENU.map((item) => (
+          {visibleMenu.map((item) => (
             <button
               key={item.key}
               type="button"
@@ -336,6 +786,9 @@ function App() {
             </button>
           ))}
         </nav>
+        <button type="button" className="ghost-btn" onClick={onLogout}>
+          로그아웃
+        </button>
       </aside>
 
       <main className="content">
@@ -344,102 +797,106 @@ function App() {
           {isMockMode && <span className="badge">Mock 데이터 모드</span>}
         </header>
 
-        <section className="panel source-tabs">
-          <button
-            className={appliedFilters.sourceType === 'lease' ? 'tab active' : 'tab'}
-            onClick={() => onSourceChange('lease')}
-            type="button"
-          >
-            리스
-          </button>
-          <button
-            className={appliedFilters.sourceType === 'rent' ? 'tab active' : 'tab'}
-            onClick={() => onSourceChange('rent')}
-            type="button"
-          >
-            렌트
-          </button>
-        </section>
+        {menu !== 'dealer-discounts' && (
+          <>
+            <section className="panel source-tabs">
+              <button
+                className={appliedFilters.sourceType === 'lease' ? 'tab active' : 'tab'}
+                onClick={() => onSourceChange('lease')}
+                type="button"
+              >
+                리스
+              </button>
+              <button
+                className={appliedFilters.sourceType === 'rent' ? 'tab active' : 'tab'}
+                onClick={() => onSourceChange('rent')}
+                type="button"
+              >
+                렌트
+              </button>
+            </section>
 
-        <section className="panel">
-          <form className="filters" onSubmit={onSubmit}>
-            <input
-              placeholder="통합 검색 (차종/라인업/세부모델/금융사)"
-              value={filters.q}
-              onChange={(e) => setFilters({ ...filters, q: e.target.value })}
-            />
-            <input
-              list="maker-suggestions"
-              placeholder="제조사"
-              value={filters.maker}
-              onChange={(e) => setFilters({ ...filters, maker: e.target.value })}
-            />
-            <input
-              list="model-suggestions"
-              placeholder="모델"
-              value={filters.model}
-              onChange={(e) => setFilters({ ...filters, model: e.target.value })}
-            />
-            <input
-              list="finance-suggestions"
-              placeholder="금융사"
-              value={filters.finance}
-              onChange={(e) => setFilters({ ...filters, finance: e.target.value })}
-            />
-            <input
-              placeholder="기준월 (YYYY-MM)"
-              value={filters.snapshotMonth}
-              onChange={(e) => setFilters({ ...filters, snapshotMonth: e.target.value })}
-            />
-            <input placeholder="기간(개월)" value={filters.termMonths} onChange={(e) => setFilters({ ...filters, termMonths: e.target.value })} />
-            <input
-              placeholder="약정거리(km)"
-              value={filters.annualMileageKm}
-              onChange={(e) => setFilters({ ...filters, annualMileageKm: e.target.value })}
-            />
-            <select value={filters.pageSize} onChange={(e) => setFilters({ ...filters, pageSize: Number(e.target.value) })}>
-              <option value={20}>20개</option>
-              <option value={50}>50개</option>
-              <option value={100}>100개</option>
-            </select>
-            <select
-              value={filters.sortBy}
-              onChange={(e) => setFilters({ ...filters, sortBy: e.target.value as ResidualSortBy })}
-            >
-              <option value="residual_value_percent">정렬: 잔존가치%</option>
-              <option value="maker_name">정렬: 제조사</option>
-              <option value="model_name">정렬: 모델</option>
-              <option value="detail_model_name">정렬: 세부모델</option>
-              <option value="term_months">정렬: 기간</option>
-              <option value="annual_mileage_km">정렬: 약정거리</option>
-              <option value="finance_name">정렬: 금융사</option>
-              <option value="snapshot_month">정렬: 기준월</option>
-            </select>
-            <select
-              value={filters.sortOrder}
-              onChange={(e) => setFilters({ ...filters, sortOrder: e.target.value as ResidualSortOrder })}
-            >
-              <option value="desc">내림차순</option>
-              <option value="asc">오름차순</option>
-            </select>
-            <button type="submit">조회</button>
-            <datalist id="maker-suggestions">
-              {suggestions.maker.map((item) => (
-                <option key={item} value={item} />
-              ))}
-            </datalist>
-            <datalist id="model-suggestions">
-              {suggestions.model.map((item) => (
-                <option key={item} value={item} />
-              ))}
-            </datalist>
-            <datalist id="finance-suggestions">
-              {suggestions.finance.map((item) => (
-                <option key={item} value={item} />
-              ))}
-            </datalist>
-          </form>
-        </section>
+            <section className="panel">
+              <form className="filters" onSubmit={onSubmit}>
+                <input
+                  placeholder="통합 검색 (차종/라인업/세부모델/금융사)"
+                  value={filters.q}
+                  onChange={(e) => setFilters({ ...filters, q: e.target.value })}
+                />
+                <input
+                  list="maker-suggestions"
+                  placeholder="제조사"
+                  value={filters.maker}
+                  onChange={(e) => setFilters({ ...filters, maker: e.target.value })}
+                />
+                <input
+                  list="model-suggestions"
+                  placeholder="모델"
+                  value={filters.model}
+                  onChange={(e) => setFilters({ ...filters, model: e.target.value })}
+                />
+                <input
+                  list="finance-suggestions"
+                  placeholder="금융사"
+                  value={filters.finance}
+                  onChange={(e) => setFilters({ ...filters, finance: e.target.value })}
+                />
+                <input
+                  placeholder="기준월 (YYYY-MM)"
+                  value={filters.snapshotMonth}
+                  onChange={(e) => setFilters({ ...filters, snapshotMonth: e.target.value })}
+                />
+                <input placeholder="기간(개월)" value={filters.termMonths} onChange={(e) => setFilters({ ...filters, termMonths: e.target.value })} />
+                <input
+                  placeholder="약정거리(km)"
+                  value={filters.annualMileageKm}
+                  onChange={(e) => setFilters({ ...filters, annualMileageKm: e.target.value })}
+                />
+                <select value={filters.pageSize} onChange={(e) => setFilters({ ...filters, pageSize: Number(e.target.value) })}>
+                  <option value={20}>20개</option>
+                  <option value={50}>50개</option>
+                  <option value={100}>100개</option>
+                </select>
+                <select
+                  value={filters.sortBy}
+                  onChange={(e) => setFilters({ ...filters, sortBy: e.target.value as ResidualSortBy })}
+                >
+                  <option value="residual_value_percent">정렬: 잔존가치%</option>
+                  <option value="maker_name">정렬: 제조사</option>
+                  <option value="model_name">정렬: 모델</option>
+                  <option value="detail_model_name">정렬: 세부모델</option>
+                  <option value="term_months">정렬: 기간</option>
+                  <option value="annual_mileage_km">정렬: 약정거리</option>
+                  <option value="finance_name">정렬: 금융사</option>
+                  <option value="snapshot_month">정렬: 기준월</option>
+                </select>
+                <select
+                  value={filters.sortOrder}
+                  onChange={(e) => setFilters({ ...filters, sortOrder: e.target.value as ResidualSortOrder })}
+                >
+                  <option value="desc">내림차순</option>
+                  <option value="asc">오름차순</option>
+                </select>
+                <button type="submit">조회</button>
+                <datalist id="maker-suggestions">
+                  {suggestions.maker.map((item) => (
+                    <option key={item} value={item} />
+                  ))}
+                </datalist>
+                <datalist id="model-suggestions">
+                  {suggestions.model.map((item) => (
+                    <option key={item} value={item} />
+                  ))}
+                </datalist>
+                <datalist id="finance-suggestions">
+                  {suggestions.finance.map((item) => (
+                    <option key={item} value={item} />
+                  ))}
+                </datalist>
+              </form>
+            </section>
+          </>
+        )}
 
         {error && <p className="error">{error}</p>}
 
@@ -463,6 +920,23 @@ function App() {
           changeTotalPages,
           setChangePage,
           uploadRows,
+          dealerBrand,
+          setDealerBrand,
+          dealerCode,
+          setDealerCode,
+          isDealerUser: profile.role === 'dealer',
+          dealerSearchText,
+          setDealerSearchText,
+          applyDealerSearch,
+          dealerVehicles,
+          dealerDiscountRows,
+          dealerDraftAmounts,
+          setDealerDraftAmounts,
+          dealerLoading,
+          dealerSubmitMessage,
+          dealerSubmitError,
+          submitDealerDiscount,
+          submitDealerDiscountAll,
           uploadLeaseFile,
           uploading,
           uploadMessage,
@@ -503,6 +977,23 @@ function renderPage(
     changeTotalPages: number
     setChangePage: (next: number | ((prev: number) => number)) => void
     uploadRows: UploadHistoryRow[]
+    dealerBrand: string
+    setDealerBrand: (value: string) => void
+    dealerCode: string
+    setDealerCode: (value: string) => void
+    isDealerUser: boolean
+    dealerSearchText: string
+    setDealerSearchText: (value: string) => void
+    applyDealerSearch: () => void
+    dealerVehicles: DealerVehicleRow[]
+    dealerDiscountRows: DealerDiscountRow[]
+    dealerDraftAmounts: Record<string, string>
+    setDealerDraftAmounts: (updater: (prev: Record<string, string>) => Record<string, string>) => void
+    dealerLoading: boolean
+    dealerSubmitMessage: string | null
+    dealerSubmitError: string | null
+    submitDealerDiscount: (vehicle: DealerVehicleRow, rawAmount: string) => Promise<void>
+    submitDealerDiscountAll: () => Promise<void>
     uploadLeaseFile: (file: File, snapshotMonth: string) => Promise<void>
     uploading: boolean
     uploadMessage: string | null
@@ -569,6 +1060,34 @@ function renderPage(
           setPage={state.setChangePage}
           page={state.changePage}
           totalPages={state.changeTotalPages}
+        />
+      </section>
+    )
+  }
+
+  if (menu === 'dealer-discounts') {
+    return (
+      <section className="panel">
+        <h2>딜러 할인 입력</h2>
+        <p className="section-sub">브랜드(제조사)별 차량 목록에서 모델/세부모델을 선택해 할인 금액을 입력합니다.</p>
+        <DealerDiscountPanel
+          dealerBrand={state.dealerBrand}
+          setDealerBrand={state.setDealerBrand}
+          dealerCode={state.dealerCode}
+          setDealerCode={state.setDealerCode}
+          isDealerUser={state.isDealerUser}
+          dealerSearchText={state.dealerSearchText}
+          setDealerSearchText={state.setDealerSearchText}
+          applyDealerSearch={state.applyDealerSearch}
+          dealerVehicles={state.dealerVehicles}
+          dealerDiscountRows={state.dealerDiscountRows}
+          dealerDraftAmounts={state.dealerDraftAmounts}
+          setDealerDraftAmounts={state.setDealerDraftAmounts}
+          dealerLoading={state.dealerLoading}
+          dealerSubmitMessage={state.dealerSubmitMessage}
+          dealerSubmitError={state.dealerSubmitError}
+          onSubmit={state.submitDealerDiscount}
+          onSubmitAll={state.submitDealerDiscountAll}
         />
       </section>
     )
@@ -902,6 +1421,146 @@ function UploadHistoryTable({ rows }: { rows: UploadHistoryRow[] }) {
   )
 }
 
+function DealerDiscountPanel({
+  dealerBrand,
+  setDealerBrand,
+  dealerCode,
+  setDealerCode,
+  isDealerUser,
+  dealerSearchText,
+  setDealerSearchText,
+  applyDealerSearch,
+  dealerVehicles,
+  dealerDiscountRows,
+  dealerDraftAmounts,
+  setDealerDraftAmounts,
+  dealerLoading,
+  dealerSubmitMessage,
+  dealerSubmitError,
+  onSubmit,
+  onSubmitAll,
+}: {
+  dealerBrand: string
+  setDealerBrand: (value: string) => void
+  dealerCode: string
+  setDealerCode: (value: string) => void
+  isDealerUser: boolean
+  dealerSearchText: string
+  setDealerSearchText: (value: string) => void
+  applyDealerSearch: () => void
+  dealerVehicles: DealerVehicleRow[]
+  dealerDiscountRows: DealerDiscountRow[]
+  dealerDraftAmounts: Record<string, string>
+  setDealerDraftAmounts: (updater: (prev: Record<string, string>) => Record<string, string>) => void
+  dealerLoading: boolean
+  dealerSubmitMessage: string | null
+  dealerSubmitError: string | null
+  onSubmit: (vehicle: DealerVehicleRow, rawAmount: string) => Promise<void>
+  onSubmitAll: () => Promise<void>
+}) {
+  const discountMap = useMemo(() => {
+    const map = new Map<string, DealerDiscountRow>()
+    for (const row of dealerDiscountRows) {
+      map.set(`${row.maker_name}|${row.model_name}|${row.detail_model_name}`, row)
+    }
+    return map
+  }, [dealerDiscountRows])
+
+  return (
+    <>
+      <div className="filters dealer-filters">
+        <input
+          placeholder="딜러 제조사 (예: BMW)"
+          value={dealerBrand}
+          onChange={(e) => setDealerBrand(e.target.value)}
+          disabled={isDealerUser}
+        />
+        <input
+          placeholder="딜러 코드 (예: BMW-SEOUL-01)"
+          value={dealerCode}
+          onChange={(e) => setDealerCode(e.target.value)}
+          disabled={isDealerUser}
+        />
+        <input
+          placeholder="차량 검색 (모델/세부모델)"
+          value={dealerSearchText}
+          onChange={(e) => setDealerSearchText(e.target.value)}
+        />
+        <button type="button" onClick={applyDealerSearch} disabled={dealerLoading}>
+          {dealerLoading ? '조회중...' : '검색'}
+        </button>
+        <button type="button" onClick={() => void onSubmitAll()} disabled={dealerLoading}>
+          {dealerLoading ? '처리중...' : '일괄 저장'}
+        </button>
+      </div>
+      {dealerSubmitMessage && <p className="upload-msg ok">{dealerSubmitMessage}</p>}
+      {dealerSubmitError && <p className="upload-msg err">{dealerSubmitError}</p>}
+      <div className="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>제조사</th>
+              <th>모델</th>
+              <th>세부모델</th>
+              <th>기존 할인(원)</th>
+              <th>할인 금액(원)</th>
+              <th>수정시각</th>
+              <th>저장</th>
+            </tr>
+          </thead>
+          <tbody>
+            {dealerVehicles.map((vehicle) => {
+              const vehicleKey = toVehicleKey(vehicle)
+              const existing = discountMap.get(vehicleKey)
+              const inputValue =
+                dealerDraftAmounts[vehicleKey] ??
+                (existing?.discount_amount ? String(existing.discount_amount) : '')
+
+              return (
+                <tr key={vehicleKey}>
+                  <td>{vehicle.maker_name}</td>
+                  <td>{vehicle.model_name}</td>
+                  <td>{vehicle.detail_model_name}</td>
+                  <td>{existing ? Number(existing.discount_amount).toLocaleString() : '-'}</td>
+                  <td>
+                    <input
+                      className="dealer-amount-input"
+                      placeholder="할인 금액"
+                      value={inputValue}
+                      onChange={(e) =>
+                        setDealerDraftAmounts((prev) => ({
+                          ...prev,
+                          [vehicleKey]: e.target.value,
+                        }))
+                      }
+                    />
+                  </td>
+                  <td>{existing ? formatDateTime(existing.updated_at) : '-'}</td>
+                  <td>
+                    <button
+                      type="button"
+                      className="ghost-btn"
+                      onClick={() => void onSubmit(vehicle, inputValue)}
+                      disabled={dealerLoading}
+                    >
+                      저장
+                    </button>
+                  </td>
+                </tr>
+              )
+            })}
+            {dealerVehicles.length === 0 && (
+              <tr>
+                <td colSpan={7} className="empty">조건에 맞는 차량 데이터가 없습니다.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </>
+  )
+}
+
 function statusToClass(status: UploadHistoryRow['status']) {
   if (status === 'completed') return 'completed'
   if (status === 'failed') return 'failed'
@@ -1008,6 +1667,8 @@ function getPageTitle(menu: MenuKey) {
       return '세부모델 최고 잔존가치'
     case 'changes':
       return '월간 변동 리포트'
+    case 'dealer-discounts':
+      return '딜러 할인 입력'
     default:
       return '업로드 이력'
   }
@@ -1076,6 +1737,20 @@ function formatDateTime(input: string) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(
     d.getHours(),
   ).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+function toVehicleKey(vehicle: DealerVehicleRow) {
+  return `${vehicle.maker_name}|${vehicle.model_name}|${vehicle.detail_model_name}`
+}
+
+function formatCurrentMonth() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+function toAuthEmail(loginId: string) {
+  const normalized = loginId.trim().toLowerCase().replace(/[^a-z0-9._-]/g, '')
+  return `${normalized}@mrcha.local`
 }
 
 export default App

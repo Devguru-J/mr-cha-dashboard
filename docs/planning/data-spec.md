@@ -109,7 +109,7 @@
 
 권장 테이블:
 
-- `user_roles (user_id uuid pk, role app_role not null, dealer_scope text[] null)`
+- `user_roles (user_id uuid pk, login_id text unique, role app_role not null, dealer_brand dealer_brand null, dealer_code text null, dealer_scope text[] null)`
 - `dealer_discounts` (딜러 입력 할인 데이터 저장용, dealer scope 기반 RLS 적용)
 
 ## 9) Future CSV Standard
@@ -138,10 +138,24 @@
 - fields: `field=maker_name|model_name|finance_name`
 - filters: `sourceType`, `snapshotMonth`, `q`, `limit`
 
+4. `GET /api/dealer-vehicles`
+- purpose: 딜러 할인 입력용 차량 목록 조회
+- key fields: `maker_name`, `model_name`, `detail_model_name`
+- filters: `sourceType`, `dealerBrand`, `snapshotMonth`, `q`, `limit`
+
+5. `GET /api/dealer-discounts`
+- purpose: 딜러 할인 입력 이력 조회
+- filters: `sourceType`, `dealerBrand`, `dealerCode`, `snapshotMonth`, `limit`
+
+6. `POST /api/dealer-discounts`
+- purpose: 딜러 할인 입력(업서트)
+- key: `dealer_code + source_type + snapshot_month + maker_name + model_name + detail_model_name`
+
 ## 11) Planned API Spec (Next)
 1. Auth
 - `GET /api/me`
-- response: `user_id`, `email`, `role`, `dealer_scope`
+- response: `user_id`, `email`, `login_id`, `role`, `dealer_brand`, `dealer_code`
+- `POST /api/register-profile` (signup 후 role/profile 매핑)
 
 2. Dealer Discounts
 - `GET /api/dealer-discounts`

@@ -264,3 +264,19 @@ export const MOCK_UPLOADS = [
     created_at: '2026-01-08T15:12:00+09:00',
   },
 ] as const
+
+export const MOCK_DEALER_DISCOUNTS = [
+  {
+    id: 1,
+    dealer_code: 'BMW-SEOUL-01',
+    source_type: 'lease',
+    snapshot_month: '2026-03-01',
+    maker_name: 'BMW',
+    model_name: '5시리즈',
+    detail_model_name: 'M Sport',
+    discount_amount: 1200000,
+    note: '3월 프로모션 기본 할인',
+    created_at: '2026-03-07T11:30:00+09:00',
+    updated_at: '2026-03-07T11:30:00+09:00',
+  },
+] as const

@@ -40,34 +40,35 @@
 - [x] 검색 자동완성 API/UI 적용 (`GET /api/suggestions`)
 
 ## Sprint 5 - Auth / RLS / Ops
-- [ ] Supabase Auth 관리자 로그인
+- [x] Supabase Auth 관리자 로그인
 - [ ] Role ENUM 생성: `super`, `manager`, `dealer`
-- [ ] `user_roles` 테이블 및 사용자-역할 매핑
+- [x] `user_roles` 테이블 및 사용자-역할 매핑
 - [ ] RLS 정책 적용
 - [ ] `super(admin)`: 전체 read/write + 권한관리
 - [ ] `manager(실무자)`: 전체 read + 업로드
 - [ ] `dealer(딜러사)`: 기본 read + `dealer_discounts` 페이지 한정 write + scope 제한
-- [ ] `dealer_discounts` 테이블/폼/API/RLS 구현
+- [~] `dealer_discounts` 테이블/폼/API/RLS 구현 (테이블/폼/API 완료, RLS 대기)
 - [ ] 업로드 이력 화면
 - [ ] 에러 로깅/모니터링 기초 연결
 
 ### Sprint 5 Execution Checklist (Order)
 1. Auth Baseline
-- [ ] Supabase Auth 세션 검증 미들웨어 추가
-- [ ] API 공통 컨텍스트에 `user_id`, `role` 주입
-- [ ] 프론트 로그인/로그아웃 상태 표시
+- [x] Supabase Auth 세션 검증 미들웨어 추가 (`/api/me` bearer token)
+- [x] API 공통 컨텍스트에 `user_id`, `role` 주입(내 정보 조회/역할 매핑)
+- [x] 프론트 로그인/로그아웃 상태 표시
 
 2. Role / RLS
-- [ ] `user_roles` seed 정책(`super` 1명 초기 등록) 정의
+- [x] `user_roles` seed 정책(`super` 1명 초기 등록) 정의
 - [ ] `residual_values`/`uploads` RLS SQL 적용
 - [ ] `dealer_discounts` RLS SQL 적용(자기 scope만 write)
 - [ ] 정책 검증 쿼리 문서(`allow/deny`) 작성
 
 3. Dealer Discounts
-- [ ] `GET /api/dealer-discounts`
-- [ ] `POST /api/dealer-discounts`
+- [x] `GET /api/dealer-discounts`
+- [x] `POST /api/dealer-discounts`
 - [ ] `PATCH /api/dealer-discounts/:id`
-- [ ] 할인 페이지 UI(목록 + 등록/수정)
+- [x] 할인 페이지 UI(목록 + 등록/수정)
+- [x] 차량 목록 API(`GET /api/dealer-vehicles`) 추가: 제조사/모델/세부모델 기준
 
 4. Ops / Deploy
 - [ ] GitHub -> Cloudflare Pages build settings 문서화
@@ -80,10 +81,17 @@
 - [ ] 운영 가이드에서 CSV-only 전환
 
 ## Sprint 7 - Drizzle Transition
-- [ ] Drizzle migration 기준으로 schema 단일화
+- [~] Drizzle migration 기준으로 schema 단일화 (경로/설정/생성 확인 완료)
 - [ ] 조회 API(`residual-values`, `changes`) Drizzle 전환
 - [ ] 업로드 적재 경로 Drizzle 전환
 - [ ] Supabase SDK direct query 최소화
+
+## Progress Update (2026-03-08)
+- [x] 딜러 할인 입력 UI를 표 기반(행별/일괄 저장)으로 변경
+- [x] 로그인 입력을 아이디 기반으로 전환(내부 auth email 매핑)
+- [x] `/api/register-profile`, `/api/me` 추가
+- [x] `user_roles.login_id` 마이그레이션 추가/적용
+- [x] `dealer_discounts` 스키마 보강 마이그레이션 추가/적용
 
 ## API Draft
 1. `POST /api/uploads`
