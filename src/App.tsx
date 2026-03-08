@@ -696,10 +696,16 @@ function App() {
 
   if (!accessToken || !profile?.role) {
     return (
-      <main className="content">
-        <section className="panel auth-panel">
+      <main className="auth-layout">
+        <section className="auth-card">
+          <p className="auth-eyebrow">MR CHA 운영자</p>
           <h2>{authMode === 'login' ? '로그인' : '회원가입'}</h2>
-          <form className="filters" onSubmit={onAuthSubmit}>
+          <p className="section-sub">
+            {authMode === 'login'
+              ? '아이디와 비밀번호로 로그인하세요.'
+              : '역할과 소속 정보를 선택해 계정을 생성하세요.'}
+          </p>
+          <form className="auth-form" onSubmit={onAuthSubmit}>
             <input
               type="text"
               placeholder="아이디"
@@ -754,8 +760,12 @@ function App() {
               {authLoading ? '처리중...' : authMode === 'login' ? '로그인' : '회원가입'}
             </button>
           </form>
-          <div className="sub-toolbar">
-            <button type="button" className="ghost-btn" onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')}>
+          <div className="auth-footer">
+            <button
+              type="button"
+              className="ghost-btn"
+              onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')}
+            >
               {authMode === 'login' ? '회원가입으로' : '로그인으로'}
             </button>
           </div>
@@ -772,21 +782,23 @@ function App() {
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <div className="brand">MR CHA 운영자</div>
-        <p className="section-sub">{profile.login_id ?? profile.email} ({profile.role})</p>
-        <nav className="menu">
-          {visibleMenu.map((item) => (
-            <button
-              key={item.key}
-              type="button"
-              className={menu === item.key ? 'menu-item active' : 'menu-item'}
-              onClick={() => setMenu(item.key)}
-            >
-              {item.label}
-            </button>
-          ))}
-        </nav>
-        <button type="button" className="ghost-btn" onClick={onLogout}>
+        <div className="sidebar-top">
+          <div className="brand">MR CHA 운영자</div>
+          <p className="section-sub">{profile.login_id ?? profile.email} ({profile.role})</p>
+          <nav className="menu">
+            {visibleMenu.map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                className={menu === item.key ? 'menu-item active' : 'menu-item'}
+                onClick={() => setMenu(item.key)}
+              >
+                {item.label}
+              </button>
+            ))}
+          </nav>
+        </div>
+        <button type="button" className="ghost-btn sidebar-logout" onClick={onLogout}>
           로그아웃
         </button>
       </aside>
