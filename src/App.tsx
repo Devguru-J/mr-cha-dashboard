@@ -696,95 +696,134 @@ function App() {
 
   if (!accessToken || !profile?.role) {
     return (
-      <main className="auth-layout">
-        <section className="auth-card">
-          <p className="auth-eyebrow">MR CHA 운영자</p>
-          <h2>{authMode === 'login' ? '로그인' : '회원가입'}</h2>
-          <p className="section-sub">
-            {authMode === 'login'
-              ? '아이디와 비밀번호로 로그인하세요.'
-              : '역할과 소속 정보를 선택해 계정을 생성하세요.'}
-          </p>
-          <form className="auth-form" onSubmit={onAuthSubmit}>
-            <input
-              type="text"
-              placeholder="아이디"
-              value={authLoginId}
-              onChange={(e) => setAuthLoginId(e.target.value)}
-              required
-            />
-            <input
-              type="password"
-              placeholder="비밀번호"
-              value={authPassword}
-              onChange={(e) => setAuthPassword(e.target.value)}
-              required
-            />
-            {authMode === 'signup' && (
-              <>
-                <select value={signupRole} onChange={(e) => setSignupRole(e.target.value as AppRole)}>
-                  <option value="dealer">dealer</option>
-                  <option value="manager">manager</option>
-                  <option value="super">super</option>
-                </select>
-                {signupRole === 'dealer' ? (
-                  <>
-                    <select value={signupDealerBrand} onChange={(e) => setSignupDealerBrand(e.target.value)}>
-                      <option value="BMW">BMW</option>
-                      <option value="BENZ">BENZ</option>
-                      <option value="AUDI">AUDI</option>
-                      <option value="HYUNDAI">HYUNDAI</option>
-                      <option value="KIA">KIA</option>
-                      <option value="GENESIS">GENESIS</option>
-                      <option value="ETC">ETC</option>
-                    </select>
-                    <input
-                      placeholder="딜러 코드 (예: BMW-SEOUL-01)"
-                      value={signupDealerCode}
-                      onChange={(e) => setSignupDealerCode(e.target.value)}
-                      required
-                    />
-                  </>
-                ) : (
-                  <input
-                    type="password"
-                    placeholder="관리자 가입 토큰"
-                    value={signupAdminToken}
-                    onChange={(e) => setSignupAdminToken(e.target.value)}
-                    required
-                  />
-                )}
-              </>
-            )}
-            <button type="submit" disabled={authLoading}>
-              {authLoading ? '처리중...' : authMode === 'login' ? '로그인' : '회원가입'}
-            </button>
-          </form>
-          <div className="auth-footer">
-            <button
-              type="button"
-              className="ghost-btn"
-              onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')}
-            >
-              {authMode === 'login' ? '회원가입으로' : '로그인으로'}
-            </button>
+      <main className="stitch-auth-shell">
+        <section className="stitch-auth-container">
+          <div className="stitch-brand-block">
+            <div className="stitch-brand-icon">🚘</div>
+            <h1>MR CHA 운영자</h1>
+            <p>운영자 전용 관리 시스템에 로그인하세요</p>
           </div>
-          {authMessage && <p className="upload-msg ok">{authMessage}</p>}
-          {authError && <p className="upload-msg err">{authError}</p>}
+          <div className="stitch-auth-card">
+            <div className="stitch-tabs">
+              <button
+                type="button"
+                className={authMode === 'login' ? 'stitch-tab active' : 'stitch-tab'}
+                onClick={() => setAuthMode('login')}
+              >
+                로그인
+              </button>
+              <button
+                type="button"
+                className={authMode === 'signup' ? 'stitch-tab active' : 'stitch-tab'}
+                onClick={() => setAuthMode('signup')}
+              >
+                회원가입
+              </button>
+            </div>
+            <form className="stitch-auth-form" onSubmit={onAuthSubmit}>
+              <div className="stitch-field">
+                <label>아이디</label>
+                <input
+                  type="text"
+                  placeholder="아이디를 입력하세요"
+                  value={authLoginId}
+                  onChange={(e) => setAuthLoginId(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="stitch-field">
+                <label>비밀번호</label>
+                <input
+                  type="password"
+                  placeholder="비밀번호를 입력하세요"
+                  value={authPassword}
+                  onChange={(e) => setAuthPassword(e.target.value)}
+                  required
+                />
+              </div>
+              {authMode === 'login' && (
+                <div className="stitch-helper-row">
+                  <label>
+                    <input type="checkbox" /> 로그인 상태 유지
+                  </label>
+                  <a href="#">비밀번호 찾기</a>
+                </div>
+              )}
+              {authMode === 'signup' && (
+                <>
+                  <div className="stitch-field">
+                    <label>권한 설정(역할)</label>
+                    <select value={signupRole} onChange={(e) => setSignupRole(e.target.value as AppRole)}>
+                      <option value="dealer">dealer</option>
+                      <option value="manager">manager</option>
+                      <option value="super">super</option>
+                    </select>
+                  </div>
+                  {signupRole === 'dealer' ? (
+                    <>
+                      <div className="stitch-field">
+                        <label>브랜드 선택</label>
+                        <select value={signupDealerBrand} onChange={(e) => setSignupDealerBrand(e.target.value)}>
+                          <option value="BMW">BMW</option>
+                          <option value="BENZ">BENZ</option>
+                          <option value="AUDI">AUDI</option>
+                          <option value="HYUNDAI">HYUNDAI</option>
+                          <option value="KIA">KIA</option>
+                          <option value="GENESIS">GENESIS</option>
+                          <option value="ETC">ETC</option>
+                        </select>
+                      </div>
+                      <div className="stitch-field">
+                        <label>딜러코드</label>
+                        <input
+                          placeholder="딜러코드를 입력하세요"
+                          value={signupDealerCode}
+                          onChange={(e) => setSignupDealerCode(e.target.value)}
+                          required
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <div className="stitch-field">
+                      <label>관리자 가입 토큰</label>
+                      <input
+                        type="password"
+                        placeholder="관리자 가입 토큰"
+                        value={signupAdminToken}
+                        onChange={(e) => setSignupAdminToken(e.target.value)}
+                        required
+                      />
+                    </div>
+                  )}
+                </>
+              )}
+              <button type="submit" className="stitch-submit" disabled={authLoading}>
+                {authLoading ? '처리중...' : authMode === 'login' ? '로그인' : '가입 신청하기'}
+              </button>
+            </form>
+            {authMessage && <p className="upload-msg ok">{authMessage}</p>}
+            {authError && <p className="upload-msg err">{authError}</p>}
+          </div>
+          <div className="stitch-auth-footer">
+            <a href="#">Terms</a>
+            <a href="#">Privacy</a>
+            <a href="#">Help Center</a>
+          </div>
         </section>
       </main>
     )
   }
 
   const visibleMenu =
-    profile.role === 'dealer' ? MENU.filter((item) => item.key === 'dealer-discounts') : MENU
+    profile.role === 'dealer'
+      ? MENU.filter((item) => item.key === 'dealer-discounts')
+      : MENU
 
   return (
     <div className="app-shell">
       <aside className="sidebar">
         <div className="sidebar-top">
           <div className="brand">MR CHA 운영자</div>
-          <p className="section-sub">{profile.login_id ?? profile.email} ({profile.role})</p>
           <nav className="menu">
             {visibleMenu.map((item) => (
               <button
@@ -1470,6 +1509,9 @@ function DealerDiscountPanel({
   onSubmit: (vehicle: DealerVehicleRow, rawAmount: string) => Promise<void>
   onSubmitAll: () => Promise<void>
 }) {
+  const [selectedVehicleKey, setSelectedVehicleKey] = useState<string | null>(null)
+  const [drawerVehicleKey, setDrawerVehicleKey] = useState<string | null>(null)
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false)
   const discountMap = useMemo(() => {
     const map = new Map<string, DealerDiscountRow>()
     for (const row of dealerDiscountRows) {
@@ -1477,6 +1519,41 @@ function DealerDiscountPanel({
     }
     return map
   }, [dealerDiscountRows])
+  useEffect(() => {
+    if (!selectedVehicleKey) return
+    setDrawerVehicleKey(selectedVehicleKey)
+    setIsDrawerOpen(true)
+  }, [selectedVehicleKey])
+
+  useEffect(() => {
+    if (!drawerVehicleKey) return
+    if (dealerVehicles.some((vehicle) => toVehicleKey(vehicle) === drawerVehicleKey)) return
+    setDrawerVehicleKey(null)
+    setSelectedVehicleKey(null)
+    setIsDrawerOpen(false)
+  }, [dealerVehicles, drawerVehicleKey])
+
+  const selectedVehicle =
+    dealerVehicles.find((vehicle) => toVehicleKey(vehicle) === drawerVehicleKey) ?? null
+  const selectedVehicleKeyValue = selectedVehicle ? toVehicleKey(selectedVehicle) : null
+  const selectedDiscount = selectedVehicleKeyValue ? discountMap.get(selectedVehicleKeyValue) : undefined
+  const selectedInputValue =
+    selectedVehicleKeyValue
+      ? dealerDraftAmounts[selectedVehicleKeyValue] ??
+        (selectedDiscount?.discount_amount ? String(selectedDiscount.discount_amount) : '')
+      : ''
+  const handleCloseDrawer = () => {
+    setIsDrawerOpen(false)
+    window.setTimeout(() => {
+      setSelectedVehicleKey(null)
+      setDrawerVehicleKey(null)
+    }, 220)
+  }
+  const handleSaveSelectedVehicle = async () => {
+    if (!selectedVehicle) return
+    await onSubmit(selectedVehicle, selectedInputValue)
+    handleCloseDrawer()
+  }
 
   return (
     <>
@@ -1507,7 +1584,7 @@ function DealerDiscountPanel({
       </div>
       {dealerSubmitMessage && <p className="upload-msg ok">{dealerSubmitMessage}</p>}
       {dealerSubmitError && <p className="upload-msg err">{dealerSubmitError}</p>}
-      <div className="table-wrap">
+      <div className="table-wrap dealer-table-pane">
         <table>
           <thead>
             <tr>
@@ -1515,47 +1592,37 @@ function DealerDiscountPanel({
               <th>모델</th>
               <th>세부모델</th>
               <th>기존 할인(원)</th>
-              <th>할인 금액(원)</th>
               <th>수정시각</th>
-              <th>저장</th>
+              <th>편집</th>
             </tr>
           </thead>
           <tbody>
             {dealerVehicles.map((vehicle) => {
               const vehicleKey = toVehicleKey(vehicle)
               const existing = discountMap.get(vehicleKey)
-              const inputValue =
-                dealerDraftAmounts[vehicleKey] ??
-                (existing?.discount_amount ? String(existing.discount_amount) : '')
+              const isSelected = vehicleKey === drawerVehicleKey
 
               return (
-                <tr key={vehicleKey}>
+                <tr
+                  key={vehicleKey}
+                  className={isSelected ? 'dealer-row-selected' : undefined}
+                  onClick={() => setSelectedVehicleKey(vehicleKey)}
+                >
                   <td>{vehicle.maker_name}</td>
                   <td>{vehicle.model_name}</td>
                   <td>{vehicle.detail_model_name}</td>
                   <td>{existing ? Number(existing.discount_amount).toLocaleString() : '-'}</td>
-                  <td>
-                    <input
-                      className="dealer-amount-input"
-                      placeholder="할인 금액"
-                      value={inputValue}
-                      onChange={(e) =>
-                        setDealerDraftAmounts((prev) => ({
-                          ...prev,
-                          [vehicleKey]: e.target.value,
-                        }))
-                      }
-                    />
-                  </td>
                   <td>{existing ? formatDateTime(existing.updated_at) : '-'}</td>
                   <td>
                     <button
                       type="button"
-                      className="ghost-btn"
-                      onClick={() => void onSubmit(vehicle, inputValue)}
-                      disabled={dealerLoading}
+                      className={isSelected ? 'ghost-btn dealer-expand-btn active' : 'ghost-btn dealer-expand-btn'}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setSelectedVehicleKey(vehicleKey)
+                      }}
                     >
-                      저장
+                      열기
                     </button>
                   </td>
                 </tr>
@@ -1563,12 +1630,101 @@ function DealerDiscountPanel({
             })}
             {dealerVehicles.length === 0 && (
               <tr>
-                <td colSpan={7} className="empty">조건에 맞는 차량 데이터가 없습니다.</td>
+                <td colSpan={6} className="empty">조건에 맞는 차량 데이터가 없습니다.</td>
               </tr>
             )}
           </tbody>
         </table>
       </div>
+      <div
+        className={isDrawerOpen ? 'dealer-drawer-backdrop active' : 'dealer-drawer-backdrop'}
+        onClick={handleCloseDrawer}
+      />
+      <aside className={isDrawerOpen ? 'dealer-expand-pane active' : 'dealer-expand-pane'}>
+        {selectedVehicle ? (
+          <div className="dealer-expand-card">
+            <div className="dealer-expand-topbar">
+              <div className="dealer-expand-head">
+                <p className="dealer-expand-kicker">할인 정보 편집</p>
+                <h3>{selectedVehicle.detail_model_name}</h3>
+                <span>{selectedVehicle.maker_name} / {selectedVehicle.model_name}</span>
+              </div>
+              <button
+                type="button"
+                className="ghost-btn dealer-close-icon-btn"
+                onClick={handleCloseDrawer}
+                aria-label="편집 패널 닫기"
+              >
+                ×
+              </button>
+            </div>
+            <div className="dealer-expand-form">
+              <label className="dealer-expand-field">
+                <span>제조사</span>
+                <input value={selectedVehicle.maker_name} readOnly />
+              </label>
+              <label className="dealer-expand-field">
+                <span>모델</span>
+                <input value={selectedVehicle.model_name} readOnly />
+              </label>
+              <label className="dealer-expand-field">
+                <span>세부모델</span>
+                <input value={selectedVehicle.detail_model_name} readOnly />
+              </label>
+              <label className="dealer-expand-field">
+                <span>기존 할인(원)</span>
+                <input
+                  value={selectedDiscount ? Number(selectedDiscount.discount_amount).toLocaleString() : '-'}
+                  readOnly
+                />
+              </label>
+              <label className="dealer-expand-field dealer-expand-field-wide">
+                <span>할인 금액(원)</span>
+                <input
+                  className="dealer-amount-input dealer-amount-input-wide"
+                  placeholder="할인 금액을 입력하세요"
+                  value={selectedInputValue}
+                  onChange={(e) => {
+                    if (!selectedVehicleKeyValue) return
+                    setDealerDraftAmounts((prev) => ({
+                      ...prev,
+                      [selectedVehicleKeyValue]: e.target.value,
+                    }))
+                  }}
+                />
+              </label>
+              <div className="dealer-expand-meta">
+                <span>딜러 코드: {dealerCode || '-'}</span>
+                <span>수정시각: {selectedDiscount ? formatDateTime(selectedDiscount.updated_at) : '-'}</span>
+              </div>
+              <div className="dealer-expand-actions">
+                <button
+                  type="button"
+                  className="tab dealer-action-btn dealer-close-action-btn"
+                  onClick={handleCloseDrawer}
+                  disabled={dealerLoading}
+                >
+                  닫기
+                </button>
+                <button
+                  type="button"
+                  className="tab dealer-save-btn dealer-action-btn"
+                  onClick={() => void handleSaveSelectedVehicle()}
+                  disabled={dealerLoading}
+                >
+                  {dealerLoading ? '처리중...' : '저장'}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </aside>
+      {!selectedVehicle && (
+        <div className="dealer-expand-empty">
+          <strong>차량을 선택하세요</strong>
+          <p>목록에서 차량을 선택하면 오른쪽에서 편집 패널이 슬라이드 인됩니다.</p>
+        </div>
+      )}
     </>
   )
 }
