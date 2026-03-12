@@ -4,9 +4,10 @@ import './App.css'
 import { hasSupabaseConfig, supabase } from './lib/supabase'
 
 type SourceType = 'lease' | 'rent'
-type MenuKey = 'home' | 'explorer' | 'best' | 'changes' | 'uploads' | 'dealer-discounts'
+type MenuKey = 'home' | 'explorer' | 'best' | 'changes' | 'uploads' | 'dealer-discounts' | 'invite-codes'
 type AppRole = 'super' | 'manager' | 'dealer'
 type AuthMode = 'login' | 'signup'
+type DealerBrand = 'BMW' | 'BENZ' | 'AUDI' | 'HYUNDAI' | 'KIA' | 'GENESIS' | 'ETC'
 type ResidualSortBy =
   | 'residual_value_percent'
   | 'maker_name'
@@ -106,6 +107,17 @@ type DealerDiscountRow = {
   updated_at: string
 }
 
+type DealerInviteCodeRow = {
+  id: string
+  role: AppRole
+  dealer_brand: DealerBrand | null
+  dealer_code: string | null
+  expires_at: string | null
+  used_at: string | null
+  used_by_user_id: string | null
+  created_at: string
+}
+
 type MeResponse = {
   ok: boolean
   user?: {
@@ -140,6 +152,8 @@ const DEFAULT_CHANGE_FILTERS: ChangeFilterState = {
   pageSize: 50,
 }
 
+const DEALER_BRANDS: DealerBrand[] = ['BMW', 'BENZ', 'AUDI', 'HYUNDAI', 'KIA', 'GENESIS', 'ETC']
+
 const MENU: Array<{ key: MenuKey; label: string }> = [
   { key: 'home', label: '대시보드' },
   { key: 'explorer', label: '데이터 탐색기' },
@@ -147,6 +161,7 @@ const MENU: Array<{ key: MenuKey; label: string }> = [
   { key: 'changes', label: '변동 리포트' },
   { key: 'uploads', label: '업로드 이력' },
   { key: 'dealer-discounts', label: '딜러 할인 입력' },
+  { key: 'invite-codes', label: '가입 코드 관리' },
 ]
 
 function App() {
@@ -154,7 +169,7 @@ function App() {
   const [authLoginId, setAuthLoginId] = useState('')
   const [authPassword, setAuthPassword] = useState('')
   const [signupRole, setSignupRole] = useState<AppRole>('dealer')
-  const [signupDealerBrand, setSignupDealerBrand] = useState('BMW')
+  const [signupInviteCode, setSignupInviteCode] = useState('')
   const [signupDealerCode, setSignupDealerCode] = useState('')
   const [signupAdminToken, setSignupAdminToken] = useState('')
   const [authLoading, setAuthLoading] = useState(false)
@@ -189,6 +204,13 @@ function App() {
   const [dealerLoading, setDealerLoading] = useState(false)
   const [dealerSubmitMessage, setDealerSubmitMessage] = useState<string | null>(null)
   const [dealerSubmitError, setDealerSubmitError] = useState<string | null>(null)
+  const [inviteDealerBrand, setInviteDealerBrand] = useState<DealerBrand>('BMW')
+  const [inviteExpiresInDays, setInviteExpiresInDays] = useState('7')
+  const [inviteRows, setInviteRows] = useState<DealerInviteCodeRow[]>([])
+  const [inviteLoading, setInviteLoading] = useState(false)
+  const [inviteMessage, setInviteMessage] = useState<string | null>(null)
+  const [inviteError, setInviteError] = useState<string | null>(null)
+  const [inviteCreatedCode, setInviteCreatedCode] = useState<string | null>(null)
   const [suggestions, setSuggestions] = useState<{
     maker: string[]
     model: string[]
@@ -267,6 +289,13 @@ function App() {
       listener.subscription.unsubscribe()
     }
   }, [])
+
+  useEffect(() => {
+    if (menu !== 'invite-codes') return
+    if (!accessToken) return
+    if (profile?.role !== 'super' && profile?.role !== 'manager') return
+    void loadInviteCodes()
+  }, [menu, accessToken, profile?.role])
 
   useEffect(() => {
     if (!accessToken || !profile) return
@@ -454,35 +483,28 @@ function App() {
         await fetchMyProfile(token)
         setAuthMessage('로그인 성공')
       } else {
-        const { data, error } = await supabase.auth.signUp({
-          email: toAuthEmail(loginId),
-          password: authPassword,
-        })
-        if (error) throw error
-        if (!data.user?.id) {
-          setAuthMessage('회원가입 요청 완료. 이메일 인증 후 로그인해주세요.')
-          return
-        }
-
-        const regRes = await fetch('/api/register-profile', {
+        const signupRes = await fetch('/api/signup', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            userId: data.user.id,
             loginId,
+            password: authPassword,
             role: signupRole,
-            dealerBrand: signupRole === 'dealer' ? signupDealerBrand : null,
-            dealerCode: signupRole === 'dealer' ? signupDealerCode : null,
+            inviteCode: signupRole === 'dealer' ? signupInviteCode : null,
+            dealerCode: signupRole === 'dealer' ? signupDealerCode.trim() : null,
             adminSignupToken: signupRole === 'dealer' ? '' : signupAdminToken,
           }),
         })
-        const regData = (await regRes.json()) as { ok?: boolean; message?: string }
-        if (!regRes.ok || !regData.ok) {
-          throw new Error(regData.message ?? '역할 등록 실패')
+        const signupData = (await signupRes.json()) as { ok?: boolean; message?: string }
+        if (!signupRes.ok || !signupData.ok) {
+          throw new Error(signupData.message ?? '회원가입 실패')
         }
 
         setAuthMessage('회원가입 완료. 로그인해주세요.')
         setAuthMode('login')
+        setAuthPassword('')
+        setSignupInviteCode('')
+        setSignupDealerCode('')
       }
     } catch (err) {
       setAuthError(err instanceof Error ? err.message : '인증 처리 중 오류가 발생했습니다.')
@@ -497,6 +519,70 @@ function App() {
     setProfile(null)
     setAccessToken(null)
     setMenu('home')
+  }
+
+  const loadInviteCodes = async () => {
+    if (!accessToken) return
+
+    setInviteLoading(true)
+    setInviteError(null)
+
+    try {
+      const res = await fetch('/api/dealer-invite-codes', {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      })
+      const data = (await res.json()) as { ok?: boolean; message?: string; items?: DealerInviteCodeRow[] }
+      if (!res.ok || !data.ok) {
+        throw new Error(data.message ?? '가입 코드 목록 조회 실패')
+      }
+      setInviteRows(data.items ?? [])
+    } catch (err) {
+      setInviteError(err instanceof Error ? err.message : '가입 코드 목록 조회 중 오류가 발생했습니다.')
+    } finally {
+      setInviteLoading(false)
+    }
+  }
+
+  const createInviteCode = async () => {
+    if (!accessToken) return
+
+    setInviteLoading(true)
+    setInviteError(null)
+    setInviteMessage(null)
+    setInviteCreatedCode(null)
+
+    try {
+      const res = await fetch('/api/dealer-invite-codes', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          dealerBrand: inviteDealerBrand,
+          expiresInDays: inviteExpiresInDays.trim() || '7',
+        }),
+      })
+
+      const data = (await res.json()) as {
+        ok?: boolean
+        message?: string
+        code?: string
+        item?: DealerInviteCodeRow
+      }
+
+      if (!res.ok || !data.ok || !data.code || !data.item) {
+        throw new Error(data.message ?? '가입 코드 생성 실패')
+      }
+
+      setInviteCreatedCode(data.code)
+      setInviteMessage('가입 코드가 생성되었습니다. 이 코드는 한 번만 표시됩니다.')
+      setInviteRows((prev) => [data.item!, ...prev])
+    } catch (err) {
+      setInviteError(err instanceof Error ? err.message : '가입 코드 생성 중 오류가 발생했습니다.')
+    } finally {
+      setInviteLoading(false)
+    }
   }
 
   const uploadLeaseFile = async (file: File, snapshotMonth: string) => {
@@ -762,21 +848,18 @@ function App() {
                   {signupRole === 'dealer' ? (
                     <>
                       <div className="stitch-field">
-                        <label>브랜드 선택</label>
-                        <select value={signupDealerBrand} onChange={(e) => setSignupDealerBrand(e.target.value)}>
-                          <option value="BMW">BMW</option>
-                          <option value="BENZ">BENZ</option>
-                          <option value="AUDI">AUDI</option>
-                          <option value="HYUNDAI">HYUNDAI</option>
-                          <option value="KIA">KIA</option>
-                          <option value="GENESIS">GENESIS</option>
-                          <option value="ETC">ETC</option>
-                        </select>
+                        <label>가입 코드</label>
+                        <input
+                          placeholder="발급받은 가입 코드를 입력하세요"
+                          value={signupInviteCode}
+                          onChange={(e) => setSignupInviteCode(e.target.value.toUpperCase())}
+                          required
+                        />
                       </div>
                       <div className="stitch-field">
-                        <label>딜러코드</label>
+                        <label>딜러 코드</label>
                         <input
-                          placeholder="딜러코드를 입력하세요"
+                          placeholder="예: BMW-SEOUL-01"
                           value={signupDealerCode}
                           onChange={(e) => setSignupDealerCode(e.target.value)}
                           required
@@ -817,7 +900,7 @@ function App() {
   const visibleMenu =
     profile.role === 'dealer'
       ? MENU.filter((item) => item.key === 'dealer-discounts')
-      : MENU
+      : MENU.filter((item) => item.key !== 'invite-codes' || profile.role === 'super' || profile.role === 'manager')
 
   return (
     <div className="app-shell">
@@ -848,7 +931,7 @@ function App() {
           {isMockMode && <span className="badge">Mock 데이터 모드</span>}
         </header>
 
-        {menu !== 'dealer-discounts' && (
+        {menu !== 'dealer-discounts' && menu !== 'invite-codes' && (
           <>
             <section className="panel source-tabs">
               <button
@@ -992,6 +1075,18 @@ function App() {
           uploading,
           uploadMessage,
           uploadError,
+          inviteDealerBrand,
+          setInviteDealerBrand,
+          inviteExpiresInDays,
+          setInviteExpiresInDays,
+          inviteRows,
+          inviteLoading,
+          inviteMessage,
+          inviteError,
+          inviteCreatedCode,
+          createInviteCode,
+          loadInviteCodes,
+          isInviteManager: profile.role === 'super' || profile.role === 'manager',
         })}
       </main>
     </div>
@@ -1049,6 +1144,18 @@ function renderPage(
     uploading: boolean
     uploadMessage: string | null
     uploadError: string | null
+    inviteDealerBrand: DealerBrand
+    setInviteDealerBrand: (value: DealerBrand) => void
+    inviteExpiresInDays: string
+    setInviteExpiresInDays: (value: string) => void
+    inviteRows: DealerInviteCodeRow[]
+    inviteLoading: boolean
+    inviteMessage: string | null
+    inviteError: string | null
+    inviteCreatedCode: string | null
+    createInviteCode: () => Promise<void>
+    loadInviteCodes: () => Promise<void>
+    isInviteManager: boolean
   },
 ): JSX.Element {
   if (menu === 'home') {
@@ -1139,6 +1246,29 @@ function renderPage(
           dealerSubmitError={state.dealerSubmitError}
           onSubmit={state.submitDealerDiscount}
           onSubmitAll={state.submitDealerDiscountAll}
+        />
+      </section>
+    )
+  }
+
+  if (menu === 'invite-codes') {
+    return (
+      <section className="panel">
+        <h2>가입 코드 관리</h2>
+        <p className="section-sub">딜러 가입용 1회성 코드를 생성하고 사용 여부를 확인합니다.</p>
+        <InviteCodePanel
+          inviteDealerBrand={state.inviteDealerBrand}
+          setInviteDealerBrand={state.setInviteDealerBrand}
+          inviteExpiresInDays={state.inviteExpiresInDays}
+          setInviteExpiresInDays={state.setInviteExpiresInDays}
+          inviteRows={state.inviteRows}
+          inviteLoading={state.inviteLoading}
+          inviteMessage={state.inviteMessage}
+          inviteError={state.inviteError}
+          inviteCreatedCode={state.inviteCreatedCode}
+          createInviteCode={state.createInviteCode}
+          loadInviteCodes={state.loadInviteCodes}
+          isInviteManager={state.isInviteManager}
         />
       </section>
     )
@@ -1467,6 +1597,110 @@ function UploadHistoryTable({ rows }: { rows: UploadHistoryRow[] }) {
         ) : (
           <p className="section-sub">표에서 항목을 선택하면 상세가 표시됩니다.</p>
         )}
+      </div>
+    </>
+  )
+}
+
+function InviteCodePanel({
+  inviteDealerBrand,
+  setInviteDealerBrand,
+  inviteExpiresInDays,
+  setInviteExpiresInDays,
+  inviteRows,
+  inviteLoading,
+  inviteMessage,
+  inviteError,
+  inviteCreatedCode,
+  createInviteCode,
+  loadInviteCodes,
+  isInviteManager,
+}: {
+  inviteDealerBrand: DealerBrand
+  setInviteDealerBrand: (value: DealerBrand) => void
+  inviteExpiresInDays: string
+  setInviteExpiresInDays: (value: string) => void
+  inviteRows: DealerInviteCodeRow[]
+  inviteLoading: boolean
+  inviteMessage: string | null
+  inviteError: string | null
+  inviteCreatedCode: string | null
+  createInviteCode: () => Promise<void>
+  loadInviteCodes: () => Promise<void>
+  isInviteManager: boolean
+}) {
+  if (!isInviteManager) {
+    return <p className="section-sub">가입 코드 관리는 관리자 또는 매니저만 사용할 수 있습니다.</p>
+  }
+
+  return (
+    <>
+      <div className="invite-toolbar">
+        <div className="invite-create-grid">
+          <select value={inviteDealerBrand} onChange={(e) => setInviteDealerBrand(e.target.value as DealerBrand)}>
+            {DEALER_BRANDS.map((brand) => (
+              <option key={brand} value={brand}>
+                {brand}
+              </option>
+            ))}
+          </select>
+          <input
+            type="number"
+            min={1}
+            max={365}
+            placeholder="만료일(일)"
+            value={inviteExpiresInDays}
+            onChange={(e) => setInviteExpiresInDays(e.target.value)}
+          />
+          <button type="button" onClick={() => void createInviteCode()} disabled={inviteLoading}>
+            {inviteLoading ? '생성중...' : '가입 코드 생성'}
+          </button>
+        </div>
+        <button type="button" className="ghost-btn" onClick={() => void loadInviteCodes()} disabled={inviteLoading}>
+          새로고침
+        </button>
+      </div>
+      {inviteCreatedCode && (
+        <div className="invite-created-card">
+          <p>이번에 생성된 가입 코드</p>
+          <strong>{inviteCreatedCode}</strong>
+          <span>이 코드는 지금 화면에서만 확인할 수 있습니다.</span>
+        </div>
+      )}
+      {inviteMessage && <p className="upload-msg ok">{inviteMessage}</p>}
+      {inviteError && <p className="upload-msg err">{inviteError}</p>}
+      <div className="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>역할</th>
+              <th>브랜드</th>
+              <th>딜러코드</th>
+              <th>만료일</th>
+              <th>사용상태</th>
+              <th>사용시각</th>
+              <th>생성시각</th>
+            </tr>
+          </thead>
+          <tbody>
+            {inviteRows.map((row) => (
+              <tr key={row.id}>
+                <td>{row.role}</td>
+                <td>{row.dealer_brand ?? '-'}</td>
+                <td>{row.dealer_code ?? '가입 시 입력'}</td>
+                <td>{row.expires_at ? formatDateTime(row.expires_at) : '-'}</td>
+                <td>{getInviteStatusLabel(row)}</td>
+                <td>{row.used_at ? formatDateTime(row.used_at) : '-'}</td>
+                <td>{formatDateTime(row.created_at)}</td>
+              </tr>
+            ))}
+            {inviteRows.length === 0 && (
+              <tr>
+                <td colSpan={7} className="empty">생성된 가입 코드가 없습니다.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
     </>
   )
@@ -1837,6 +2071,8 @@ function getPageTitle(menu: MenuKey) {
       return '월간 변동 리포트'
     case 'dealer-discounts':
       return '딜러 할인 입력'
+    case 'invite-codes':
+      return '가입 코드 관리'
     default:
       return '업로드 이력'
   }
@@ -1897,6 +2133,12 @@ function toKoreanStatus(status: UploadHistoryRow['status']) {
   if (status === 'completed') return '완료'
   if (status === 'failed') return '실패'
   return '처리중'
+}
+
+function getInviteStatusLabel(row: DealerInviteCodeRow) {
+  if (row.used_at) return '사용 완료'
+  if (row.expires_at && new Date(row.expires_at).getTime() < Date.now()) return '만료'
+  return '미사용'
 }
 
 function formatDateTime(input: string) {

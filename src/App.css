@@ -865,6 +865,62 @@ th {
   color: #64728b;
 }
 
+.invite-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.invite-create-grid {
+  display: grid;
+  grid-template-columns: 160px minmax(200px, 1fr) 140px 160px;
+  gap: 8px;
+  flex: 1;
+}
+
+.invite-create-grid input,
+.invite-create-grid select,
+.invite-create-grid button {
+  height: 40px;
+  border-radius: 10px;
+  border: 1px solid #ccd5e5;
+  padding: 0 12px;
+  font-size: 14px;
+}
+
+.invite-create-grid button {
+  background: #2349bd;
+  border-color: #2349bd;
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.invite-created-card {
+  border: 1px solid #d7deea;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #f7faff, #eef4ff);
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  display: grid;
+  gap: 4px;
+}
+
+.invite-created-card p,
+.invite-created-card span {
+  margin: 0;
+  color: #64728b;
+  font-size: 12px;
+}
+
+.invite-created-card strong {
+  font-size: 24px;
+  letter-spacing: 0.08em;
+  color: #2349bd;
+}
+
 .upload-box {
   border: 1px solid #dce3ef;
   border-radius: 10px;
@@ -949,6 +1005,15 @@ th {
   }
 
   .upload-box {
+    grid-template-columns: 1fr;
+  }
+
+  .invite-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .invite-create-grid {
     grid-template-columns: 1fr;
   }
 

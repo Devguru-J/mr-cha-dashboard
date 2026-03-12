@@ -15,6 +15,7 @@
 - 세부모델별 최고 잔존가치 조회
 - 월간 변동 리포트 조회
 - 업로드 이력 조회
+- 딜러용 1회성 가입 코드 발급/소진
 - Supabase 미연결 환경에서 mock 데이터 모드 지원
 
 ## 프로젝트 구조
@@ -89,6 +90,9 @@ Supabase를 아직 연결하지 않으면 API가 자동으로 mock 데이터 모
 - `GET /api/changes`
 - `GET /api/uploads`
 - `POST /api/uploads`
+- `GET /api/dealer-invite-codes`
+- `POST /api/dealer-invite-codes`
+- `POST /api/signup`
 
 ## Supabase 스키마
 

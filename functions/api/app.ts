@@ -12,6 +12,7 @@ type Bindings = {
 }
 
 type SourceType = 'lease' | 'rent'
+type DealerBrand = 'BMW' | 'BENZ' | 'AUDI' | 'HYUNDAI' | 'KIA' | 'GENESIS' | 'ETC'
 
 type NormalizedRecord = {
   source_type: SourceType
@@ -64,6 +65,17 @@ type DealerDiscountRecord = {
   updated_at: string
 }
 type AppRole = 'super' | 'manager' | 'dealer'
+type ApiStatus = 400 | 401 | 403 | 404 | 409 | 410 | 500
+type InviteCodeRecord = {
+  id: string
+  role: AppRole
+  dealer_brand: DealerBrand | null
+  dealer_code: string | null
+  expires_at: string | null
+  used_at: string | null
+  used_by_user_id: string | null
+  created_at: string
+}
 
 let mockDealerDiscounts: DealerDiscountRecord[] = MOCK_DEALER_DISCOUNTS.map((row) => ({
   id: Number(row.id),
@@ -211,6 +223,192 @@ app.post('/api/register-profile', async (c) => {
   }
 
   return c.json({ ok: true })
+})
+
+app.post('/api/signup', async (c) => {
+  const supabase = createSupabaseAdminClient(c.env)
+  if (!supabase) {
+    return c.json({ ok: false, message: 'Supabase is not configured' }, 500)
+  }
+
+  const body = await c.req.json().catch(() => null)
+  const loginId = normalizeLoginId(body?.loginId)
+  const password = String(body?.password ?? '')
+  const role = parseAppRole(body?.role)
+  const adminSignupToken = normalizeText(body?.adminSignupToken)
+  const inviteCode = normalizeInviteCode(body?.inviteCode)
+  const dealerSignupCode = normalizeText(body?.dealerCode)
+
+  if (!loginId || !password || !role) {
+    return c.json({ ok: false, message: 'loginId, password and role are required' }, 400)
+  }
+
+  if (password.length < 6) {
+    return c.json({ ok: false, message: '비밀번호는 6자 이상이어야 합니다.' }, 400)
+  }
+
+  let dealerBrand: DealerBrand | null = null
+  let dealerCode: string | null = null
+  let inviteRow: InviteCodeRecord | null = null
+
+  if (role === 'dealer') {
+    if (!inviteCode) {
+      return c.json({ ok: false, message: '가입 코드를 입력해주세요.' }, 400)
+    }
+    if (!dealerSignupCode) {
+      return c.json({ ok: false, message: '딜러 코드를 입력해주세요.' }, 400)
+    }
+
+    const inviteLookup = await findDealerInviteCodeByPlaintext(supabase, inviteCode)
+    if (!inviteLookup.ok) {
+      return c.json({ ok: false, message: inviteLookup.message }, { status: inviteLookup.status })
+    }
+
+    inviteRow = inviteLookup.invite
+    dealerBrand = inviteRow.dealer_brand
+    dealerCode = dealerSignupCode
+  } else {
+    const superCountRes = await supabase
+      .from('user_roles')
+      .select('user_id', { count: 'exact', head: true })
+      .eq('role', 'super')
+    if (superCountRes.error) {
+      return c.json({ ok: false, message: superCountRes.error.message }, 500)
+    }
+
+    const isBootstrap = (superCountRes.count ?? 0) === 0 && role === 'super'
+    if (!isBootstrap) {
+      const expected = resolveEnv(c.env, 'ADMIN_SIGNUP_TOKEN') ?? ''
+      if (!expected || adminSignupToken !== expected) {
+        return c.json({ ok: false, message: 'invalid admin signup token' }, 403)
+      }
+    }
+  }
+
+  const authRes = await supabase.auth.admin.createUser({
+    email: toAuthEmail(loginId),
+    password,
+    email_confirm: true,
+    user_metadata: { login_id: loginId },
+  })
+
+  if (authRes.error || !authRes.data.user) {
+    return c.json({ ok: false, message: authRes.error?.message ?? '회원 생성에 실패했습니다.' }, 400)
+  }
+
+  const userId = authRes.data.user.id
+  const roleInsert = await supabase.from('user_roles').insert({
+    user_id: userId,
+    login_id: loginId,
+    role,
+    dealer_brand: role === 'dealer' ? dealerBrand : null,
+    dealer_code: role === 'dealer' ? dealerCode : null,
+  })
+
+  if (roleInsert.error) {
+    await supabase.auth.admin.deleteUser(userId)
+    return c.json({ ok: false, message: roleInsert.error.message }, 500)
+  }
+
+  if (role === 'dealer' && inviteRow) {
+    const consumeRes = await supabase
+      .from('dealer_invite_codes')
+      .update({
+        used_at: new Date().toISOString(),
+        used_by_user_id: userId,
+      })
+      .eq('id', inviteRow.id)
+      .is('used_at', null)
+
+    if (consumeRes.error) {
+      await supabase.from('user_roles').delete().eq('user_id', userId)
+      await supabase.auth.admin.deleteUser(userId)
+      return c.json({ ok: false, message: '가입 코드 사용 처리에 실패했습니다.' }, 500)
+    }
+  }
+
+  return c.json({ ok: true, userId })
+})
+
+app.get('/api/dealer-invite-codes', async (c) => {
+  const supabase = createSupabaseAdminClient(c.env)
+  if (!supabase) {
+    return c.json({ ok: false, message: 'Supabase is not configured' }, 500)
+  }
+
+  const authUser = await getAuthorizedUser(c, ['super', 'manager'])
+  if (!authUser.ok) {
+    return c.json({ ok: false, message: authUser.message }, { status: authUser.status })
+  }
+
+  const result = await supabase
+    .from('dealer_invite_codes')
+    .select('id,role,dealer_brand,dealer_code,expires_at,used_at,used_by_user_id,created_at')
+    .order('created_at', { ascending: false })
+    .limit(100)
+
+  if (result.error) {
+    return c.json({ ok: false, message: result.error.message }, 500)
+  }
+
+  return c.json({ ok: true, items: result.data ?? [] })
+})
+
+app.post('/api/dealer-invite-codes', async (c) => {
+  const supabase = createSupabaseAdminClient(c.env)
+  if (!supabase) {
+    return c.json({ ok: false, message: 'Supabase is not configured' }, 500)
+  }
+
+  const authUser = await getAuthorizedUser(c, ['super', 'manager'])
+  if (!authUser.ok) {
+    return c.json({ ok: false, message: authUser.message }, { status: authUser.status })
+  }
+
+  const body = await c.req.json().catch(() => null)
+  const dealerBrand = parseDealerBrand(body?.dealerBrand)
+  const expiresInDays = clampNumber(String(body?.expiresInDays ?? ''), 7, 1, 365)
+
+  if (!dealerBrand) {
+    return c.json({ ok: false, message: '브랜드를 선택해주세요.' }, 400)
+  }
+
+  const now = new Date()
+  const expiresAt = new Date(now.getTime() + expiresInDays * 24 * 60 * 60 * 1000).toISOString()
+
+  let plainCode = ''
+  let codeHash = ''
+  let insertError: string | null = null
+
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    plainCode = generateDealerInviteCode(dealerBrand)
+    codeHash = await sha256Hex(normalizeInviteCode(plainCode))
+
+    const insertRes = await supabase
+      .from('dealer_invite_codes')
+      .insert({
+        role: 'dealer',
+        dealer_brand: dealerBrand,
+        dealer_code: null,
+        code_hash: codeHash,
+        expires_at: expiresAt,
+        created_by_user_id: authUser.user.id,
+      })
+      .select('id,role,dealer_brand,dealer_code,expires_at,used_at,used_by_user_id,created_at')
+      .single()
+
+    if (!insertRes.error && insertRes.data) {
+      return c.json({
+        ok: true,
+        code: plainCode,
+        item: insertRes.data,
+      })
+    }
+
+    insertError = insertRes.error?.message ?? '가입 코드 생성에 실패했습니다.'
+  }
+
+  return c.json({ ok: false, message: insertError ?? '가입 코드 생성에 실패했습니다.' }, 500)
 })
 
 app.get('/api/config-check', async (c) => {
@@ -1014,6 +1212,41 @@ async function getAuthUserFromRequest(c: any): Promise<
   }
 }
 
+async function getAuthorizedUser(
+  c: any,
+  allowedRoles: AppRole[],
+): Promise<
+  | { ok: true; user: { id: string; email?: string | null }; role: AppRole }
+  | { ok: false; message: string; status: ApiStatus }
+> {
+  const authUser = await getAuthUserFromRequest(c)
+  if (!authUser.ok) {
+    return { ok: false, message: authUser.message, status: 401 }
+  }
+
+  const supabase = createSupabaseAdminClient(c.env)
+  if (!supabase) {
+    return { ok: false, message: 'Supabase is not configured', status: 500 }
+  }
+
+  const roleRes = await supabase
+    .from('user_roles')
+    .select('role')
+    .eq('user_id', authUser.user.id)
+    .maybeSingle()
+
+  if (roleRes.error) {
+    return { ok: false, message: roleRes.error.message, status: 500 }
+  }
+
+  const role = parseAppRole(roleRes.data?.role)
+  if (!role || !allowedRoles.includes(role)) {
+    return { ok: false, message: '권한이 없습니다.', status: 403 }
+  }
+
+  return { ok: true, user: authUser.user, role }
+}
+
 function createSupabaseAdminClient(env: Bindings) {
   const supabaseUrl = resolveEnv(env, 'SUPABASE_URL')
   const supabaseServiceRoleKey = resolveEnv(env, 'SUPABASE_SERVICE_ROLE_KEY')
@@ -1039,6 +1272,67 @@ function resolveEnv(env: Bindings, key: keyof Bindings): string | undefined {
     return process.env[key]
   }
   return undefined
+}
+
+async function findDealerInviteCodeByPlaintext(
+  supabase: SupabaseAdminClient,
+  plainCode: string,
+): Promise<
+  | { ok: true; invite: InviteCodeRecord }
+  | { ok: false; message: string; status: ApiStatus }
+> {
+  const codeHash = await sha256Hex(normalizeInviteCode(plainCode))
+  const inviteRes = await supabase
+    .from('dealer_invite_codes')
+    .select('id,role,dealer_brand,dealer_code,expires_at,used_at,used_by_user_id,created_at')
+    .eq('code_hash', codeHash)
+    .maybeSingle()
+
+  if (inviteRes.error) {
+    return { ok: false, message: inviteRes.error.message, status: 500 }
+  }
+
+  const invite = inviteRes.data as InviteCodeRecord | null
+  if (!invite) {
+    return { ok: false, message: '유효하지 않은 가입 코드입니다.', status: 404 }
+  }
+
+  if (invite.role !== 'dealer' || !invite.dealer_brand) {
+    return { ok: false, message: '딜러 가입 코드가 아닙니다.', status: 400 }
+  }
+
+  if (invite.used_at) {
+    return { ok: false, message: '이미 사용된 가입 코드입니다.', status: 409 }
+  }
+
+  if (invite.expires_at && new Date(invite.expires_at).getTime() < Date.now()) {
+    return { ok: false, message: '만료된 가입 코드입니다.', status: 410 }
+  }
+
+  return { ok: true, invite }
+}
+
+function generateDealerInviteCode(brand: DealerBrand): string {
+  const prefix = brand.slice(0, 3)
+  return `${prefix}-${randomCodePart(4)}-${randomCodePart(4)}`
+}
+
+function randomCodePart(length: number): string {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+  const bytes = crypto.getRandomValues(new Uint8Array(length))
+  let out = ''
+  for (let i = 0; i < bytes.length; i += 1) {
+    out += alphabet[bytes[i] % alphabet.length]
+  }
+  return out
+}
+
+async function sha256Hex(input: string): Promise<string> {
+  const data = new TextEncoder().encode(input)
+  const digest = await crypto.subtle.digest('SHA-256', data)
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('')
 }
 
 async function parseWorkbook(file: File, snapshotMonth: string) {
@@ -1525,8 +1819,32 @@ function parseAppRole(value: unknown): AppRole | null {
   return null
 }
 
+function parseDealerBrand(value: unknown): DealerBrand | null {
+  if (
+    value === 'BMW' ||
+    value === 'BENZ' ||
+    value === 'AUDI' ||
+    value === 'HYUNDAI' ||
+    value === 'KIA' ||
+    value === 'GENESIS' ||
+    value === 'ETC'
+  ) {
+    return value
+  }
+  return null
+}
+
 function normalizeLoginId(value: unknown): string {
   return normalizeText(value).toLowerCase()
+}
+
+function normalizeInviteCode(value: unknown): string {
+  return normalizeText(value).toUpperCase().replace(/\s+/g, '').replace(/[^A-Z0-9-]/g, '')
+}
+
+function toAuthEmail(loginId: string) {
+  const normalized = loginId.trim().toLowerCase().replace(/[^a-z0-9._-]/g, '')
+  return `${normalized}@mrcha.local`
 }
 
 function parseDiscountAmount(value: unknown): number | null {
